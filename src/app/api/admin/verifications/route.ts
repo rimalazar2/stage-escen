@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get("to");
     const resultFilter = searchParams.get("result");
 
-    // Workaround: cast pour contourner la limitation de typage Supabase SSR
-    const verifTable = supabase.from("verifications") as any;
+    const verifTable = supabase.from("verifications");
 
     let dbQuery = verifTable
       .select("*, releves!inner(student_name, student_id)", { count: "exact" });

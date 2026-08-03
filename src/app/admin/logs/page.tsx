@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import DataTable from "@/components/admin/DataTable";
 import type { Verification, ApiResponse } from "@/lib/types/database";
 
@@ -13,7 +12,6 @@ interface VerificationWithStudent extends Verification {
  * Page d'historique des vérifications /admin/logs
  */
 export default function AdminLogsPage() {
-  const router = useRouter();
   const [verifications, setVerifications] = useState<VerificationWithStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [resultFilter, setResultFilter] = useState<string>("all");

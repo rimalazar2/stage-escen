@@ -66,14 +66,6 @@ function addCheckItem(doc, label, status) {
   doc.moveDown(0.1);
 }
 
-function addStatusTag(doc, text, color) {
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(9)
-    .fillColor(color)
-    .text(`[ ${text} ]`, { continued: false, lineGap: 4 });
-}
-
 // ─── En-tête de page avec bandeau ─────────────────────────────
 function addPageHeader(doc) {
   // Bandeau navy en haut
@@ -91,22 +83,6 @@ function addPageHeader(doc) {
   // Ligne cyan
   doc.rect(50, 48, doc.page.width - 100, 1.5).fill(CYAN);
   doc.moveDown(4);
-}
-
-// ─── Pied de page ─────────────────────────────────────────────
-function addFooter(doc) {
-  const bottom = doc.page.height - 30;
-  doc
-    .font("Helvetica")
-    .fontSize(8)
-    .fillColor(GRAY)
-    .text("ESCEN University — Document confidentiel", 50, bottom, { align: "left" });
-  doc.text(
-    `Page ${doc.bufferedPageRange().count || doc.page.pageNumber || 1}`,
-    50,
-    bottom,
-    { align: "right" }
-  );
 }
 
 // ─── Génération du PDF ────────────────────────────────────────

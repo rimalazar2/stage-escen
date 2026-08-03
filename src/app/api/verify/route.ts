@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendFraudAlert } from "@/lib/resend";
 import { isTurnstileEnabled, verifyTurnstileToken } from "@/lib/turnstile";
+import { resolveActiveReleve } from "@/lib/releves";
+import type { Database } from "@/lib/types/database";
 import crypto from "crypto";
 
 // ─── Configuration rate limiting ─────────────────────────────
@@ -32,13 +35,13 @@ function hashIP(ip: string): string {
  * - Au 5e essai dans la fenêtre → blocage 5 min.
  */
 async function checkRateLimit(
-  supabase: any,
+  supabase: SupabaseClient<Database>,
   ipHash: string
 ): Promise<{ allowed: boolean }> {
   const now = new Date();
   const windowStart = new Date(now.getTime() - RATE_LIMIT_WINDOW_MS);
 
-  const rateLimitTable = supabase.from("rate_limits") as any;
+  const rateLimitTable = supabase.from("rate_limits");
   const { data: recentAttempts } = await rateLimitTable
     .select("attempt_count, blocked_until, window_start")
     .eq("ip_address", ipHash)
@@ -108,6 +111,7 @@ async function checkRateLimit(
       endpoint: "/api/verify",
       attempt_count: newCount,
       window_start: now.toISOString(),
+      blocked_until: null,
     });
   }
 
@@ -118,7 +122,7 @@ async function checkRateLimit(
  * Log une vérification dans la base.
  */
 async function logVerification(
-  supabase: any,
+  supabase: SupabaseClient<Database>,
   params: {
     releve_id: string | null;
     attempted_id?: string;
@@ -128,7 +132,7 @@ async function logVerification(
     error_type: string;
   }
 ) {
-  await (supabase.from("verifications") as any).insert({
+  await supabase.from("verifications").insert({
     releve_id: params.releve_id,
     attempted_id: params.attempted_id ?? "",
     ip_address: params.ip_address,
@@ -284,14 +288,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Chercher le relevé ─────────────────────────────────
-    const relevesTable = supabase.from("releves") as any;
-    const { data: releve, error } = await relevesTable
-      .select("*")
-      .eq("id", id)
-      .single();
+    // ── Chercher le relevé (version active) ─────────────────
+    // Résolution via la chaîne de remplacement : le QR code d'une ancienne
+    // version affiche la version officielle à jour. Un relevé annulé ou une
+    // ancienne version à la chaîne cassée retombent dans "not_found"
+    // (anti-fraude : indistinguable d'un identifiant inconnu).
+    const releve = await resolveActiveReleve(supabase, id);
 
-    if (error || !releve) {
+    if (!releve) {
       await logVerification(supabase, {
         releve_id: null,
         attempted_id: id,
@@ -311,11 +315,6 @@ export async function POST(request: NextRequest) {
         { status: 200 }
       );
     }
-
-    // ── Relevé annulé ──────────────────────────────────────
-    // NB: la RLS (releves_select_active) masque déjà les relevés annulés
-    // au public : ils retombent dans le cas "not_found" ci-dessus (anti-fraude).
-    // Ce relevé est donc TOUJOURS actif ici.
 
     // ── Succès ─────────────────────────────────────────────
     await logVerification(supabase, {

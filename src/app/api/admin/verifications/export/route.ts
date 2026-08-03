@@ -18,8 +18,7 @@ export async function GET() {
       );
     }
 
-    // Workaround: cast pour contourner la limitation de typage Supabase SSR
-    const verifTable = supabase.from("verifications") as any;
+    const verifTable = supabase.from("verifications");
     const { data: verifications, error } = await verifTable
       .select("*, releves!inner(student_name, student_id)")
       .order("timestamp", { ascending: false });
@@ -31,7 +30,7 @@ export async function GET() {
       );
     }
 
-    const rows = (verifications ?? []).map((v: any) => [
+    const rows = (verifications ?? []).map((v) => [
       new Date(v.timestamp).toLocaleString("fr-FR"),
       v.releve_id ?? "",
       v.releves?.student_name ?? "",
@@ -44,13 +43,13 @@ export async function GET() {
 
     const csvContent = [
       ["Date", "Identifiant Relevé", "Étudiant", "ID Étudiant", "Résultat", "Type d'erreur", "IP (hashée)", "Navigateur"].join(","),
-      ...rows.map((row: string[]) =>
-        row.map((cell: string) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+      ...rows.map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
       ),
     ].join("\n");
 
     // Log l'export
-    const adminLogs = supabase.from("admin_logs") as any;
+    const adminLogs = supabase.from("admin_logs");
     await adminLogs.insert({
       admin_id: user.id,
       admin_email: user.email ?? "",

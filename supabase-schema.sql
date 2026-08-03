@@ -174,6 +174,50 @@ AS $$
   );
 $$;
 
+-- ─── Fonction : résolution de la version active d'un relevé ──
+-- Suit la chaîne de remplacement (replaced_by) jusqu'à la version
+-- actuellement active. Le QR Code d'une ancienne version continue donc
+-- de fonctionner : il affiche la version officielle à jour (cahier des
+-- charges : « l'identifiant et le QR Code ne changent jamais, une
+-- nouvelle version est publiée sous le même identifiant »).
+--
+-- Retourne NULL si l'identifiant est inconnu, annulé, ou si la chaîne
+-- de remplacement est cassée (anti-fraude : indistinguable d'un ID
+-- inconnu pour le public).
+-- SECURITY DEFINER : exécutée comme postgres, la RLS (status='active'
+-- uniquement) reste stricte — les anciennes versions ne sont jamais
+-- lisibles directement.
+-- DROP préalable : CREATE OR REPLACE ne peut pas changer le type de retour
+-- (RETURNS releves → SETOF releves). Idempotent.
+DROP FUNCTION IF EXISTS public.resolve_active_releve(uuid);
+
+CREATE OR REPLACE FUNCTION public.resolve_active_releve(p_id uuid)
+RETURNS SETOF releves
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  WITH RECURSIVE chain AS (
+    SELECT id, replaced_by, status, 1 AS depth
+    FROM public.releves
+    WHERE id = p_id
+    UNION ALL
+    SELECT r.id, r.replaced_by, r.status, c.depth + 1
+    FROM public.releves r
+    JOIN chain c ON r.id = c.replaced_by
+    WHERE c.status = 'replaced'
+      AND c.replaced_by IS NOT NULL
+      AND c.depth < 10
+  )
+  SELECT r.*
+  FROM public.releves r
+  JOIN chain c ON r.id = c.id
+  WHERE r.status = 'active'
+  ORDER BY c.depth
+  LIMIT 1;
+$$;
+
 -- ─── Row Level Security (RLS) ──────────────────────────────
 ALTER TABLE releves ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verifications ENABLE ROW LEVEL SECURITY;

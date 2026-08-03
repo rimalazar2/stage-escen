@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateQRCodeBuffer } from "@/lib/qr";
+import { resolveActiveReleve } from "@/lib/releves";
 
 /**
  * GET /api/releve/[id]/qrcode
@@ -19,20 +20,14 @@ export async function GET(
       return new NextResponse("Not found", { status: 404 });
     }
 
-    // Vérifier que le relevé existe et est actif (RLS publique).
-    // Un relevé annulé renvoie 404 (anti-fraude).
+    // Le QR code encode /verify/[id] — il ne change JAMAIS, même si le
+    // relevé est remplacé ou corrigé (pas de réimpression). On vérifie
+    // simplement que l'identifiant résout vers une version active ;
+    // un relevé annulé renvoie 404 (anti-fraude).
     const supabase = await createClient();
-    const relevesTable = supabase.from("releves") as any;
-    const { data, error } = await relevesTable
-      .select("id")
-      .eq("id", id)
-      .maybeSingle();
+    const releve = await resolveActiveReleve(supabase, id);
 
-    if (error) {
-      console.error("qrcode route — erreur DB:", error);
-    }
-
-    if (!data) {
+    if (!releve) {
       return new NextResponse("Not found", { status: 404 });
     }
 

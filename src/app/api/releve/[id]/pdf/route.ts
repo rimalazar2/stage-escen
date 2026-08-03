@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateRelevePDF } from "@/lib/pdf";
+import { resolveActiveReleve } from "@/lib/releves";
 
 /**
  * GET /api/releve/[id]/pdf
@@ -23,14 +24,13 @@ export async function GET(
     }
 
     const supabase = await createClient();
-    const relevesTable = supabase.from("releves") as any;
-    const { data: releve, error } = await relevesTable
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
 
-    // RLS : un relevé annulé/remplacé n'est pas visible → not_found (anti-fraude)
-    if (error || !releve) {
+    // Résolution via la chaîne de remplacement : le PDF servi pour une
+    // ancienne version est celui de la version officielle à jour (le QR code
+    // imprimé reste valide). Relevé annulé / chaîne cassée → not_found.
+    const releve = await resolveActiveReleve(supabase, id);
+
+    if (!releve) {
       return NextResponse.json(
         { success: false, error: { code: "not_found", message: "" } },
         { status: 404 }
@@ -44,7 +44,10 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="releve-${safeId}.pdf"`,
-        "Cache-Control": "public, max-age=3600",
+        // Pas de cache longue durée : si le relevé est remplacé, l'ID d'une
+        // ancienne version sert désormais le PDF de la version à jour — un
+        // cache périmé afficherait un document obsolète.
+        "Cache-Control": "public, no-cache",
       },
     });
   } catch {

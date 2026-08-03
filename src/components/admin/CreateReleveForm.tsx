@@ -132,7 +132,7 @@ export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFo
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-escen-text-secondary mb-1.5">
-            Nom de l'étudiant *
+            Nom de l&apos;étudiant *
           </label>
           <input
             type="text"

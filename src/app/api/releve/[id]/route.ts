@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { resolveActiveReleve } from "@/lib/releves";
 
 /**
  * GET /api/releve/[id]
@@ -22,25 +23,19 @@ export async function GET(
 
     const supabase = await createClient();
 
-    // Workaround: cast pour contourner la limitation de typage Supabase SSR
-    const relevesTable = supabase.from("releves") as any;
-    const { data, error } = await relevesTable
-      .select("*")
-      .eq("id", id)
-      .single();
+    // Résolution via la chaîne de remplacement : le QR code d'une ancienne
+    // version affiche la version officielle à jour. Un relevé annulé ou une
+    // chaîne cassée → not_found (anti-fraude : indistinguable d'un ID inconnu).
+    const releve = await resolveActiveReleve(supabase, id);
 
-    if (error || !data) {
+    if (!releve) {
       return NextResponse.json(
         { success: false, error: { code: "not_found", message: "" } },
         { status: 404 }
       );
     }
 
-    // NB: la RLS masque déjà les relevés annulés/remplacés au public.
-    // Le cas "cancelled" est donc inatteignable ici (anti-fraude :
-    // un relevé annulé est indistinguable d'un identifiant inconnu).
-
-    return NextResponse.json({ success: true, data: { releve: data } });
+    return NextResponse.json({ success: true, data: { releve } });
   } catch {
     return NextResponse.json(
       { success: false, error: { code: "server_error", message: "" } },

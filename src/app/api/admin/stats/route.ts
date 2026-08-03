@@ -21,8 +21,8 @@ export async function GET() {
       );
     }
 
-    const relevesTable = supabase.from("releves") as any;
-    const verifTable = supabase.from("verifications") as any;
+    const relevesTable = supabase.from("releves");
+    const verifTable = supabase.from("verifications");
 
     // Début de la journée en Europe/Paris
     const todayStart = startOfTodayParis();

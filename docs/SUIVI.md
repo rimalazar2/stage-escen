@@ -1,6 +1,6 @@
 # 📋 Suivi du projet — ESCEN · Vérification sécurisée des relevés
 
-> **Dernière mise à jour : 01/08/2026 (session : exécution complète + CAPTCHA)**
+> **Dernière mise à jour : 03/08/2026 (session : flux de remplacement « QR code éternel »)**
 > Ce fichier est la **source de vérité** de l'avancement. Il est mis à jour à chaque fin de session.
 > Légende : ✅ Fait · 🔄 En cours · ⏳ À faire · 🚫 Bloqué
 
@@ -14,7 +14,7 @@
 |---|---|---|
 | Page publique de vérification (`/verify`) | ✅ | Formulaire par identifiant + affichage du relevé |
 | Identifiant unique impossible à deviner (UUID) | ✅ | Généré à la création du relevé |
-| QR Code intégré au relevé | ✅ | `src/lib/qr.ts` |
+| QR Code intégré au relevé | ✅ | `src/lib/qr.ts` — **éternel** : un QR remplacé affiche la version à jour (`resolve_active_releve`) |
 | PDF du relevé | ✅ | `src/lib/pdf.ts` (API `/api/releve/[id]/pdf`) |
 | Message d'erreur générique (sans indice utile) | ✅ | `not_found` pour ID faux **et** relevé annulé |
 | Protection anti-robots : rate limiting | ✅ | Seuil + délai artificiel 200 ms |
@@ -49,7 +49,7 @@
 | Annulation d'un relevé (fraude / erreur) | ✅ | Statut `cancelled` → `not_found` au public |
 | Création manuelle d'un relevé | ✅ | `CreateReleveForm` |
 | Journal des actions admin | ✅ | Table `admin_logs` |
-| Gestion du remplacement (statut `replaced`) | 🔄 | Statut prévu ; flux de « nouvelle version » à valider |
+| Gestion du remplacement (statut `replaced`) | ✅ | Fonction SQL `resolve_active_releve` (chaîne `replaced_by` suivie côté base, SECURITY DEFINER) : le QR code d'une ancienne version affiche la version officielle à jour. Bouton « Remplacer » + validation du remplaçant (actif) dans l'admin — **testé E2E le 03/08/2026** (`scripts/test-replacement.ts`) |
 
 ---
 
@@ -65,8 +65,8 @@
 | Déploiement Vercel + domaine `verif.escen-university.fr` | ⏳ | Domaine décidé, réservation à confirmer |
 | Vérification domaine Resend (`alerts@escen-university.fr`) | ⏳ | En production uniquement (dev : `onboarding@resend.dev` ne livre qu'à l'adresse du compte — **testé**) |
 | Récupération automatique des relevés (API scolarité) | ⏳ | Nécessite un échange avec l'équipe scolarité |
-| API `/api/notify` (formulaire email de l'accueil) | ⏳ | TODO existant |
-| Mise à jour du `README.md` | ⏳ | Décrit encore uniquement la page coming-soon |
+| API `/api/notify` (formulaire email de l'accueil) | ✅ | Route implémentée (idempotent, rate limiting) — voir `src/app/api/notify/route.ts` |
+| Mise à jour du `README.md` | ✅ | Documente l'ensemble du système (pages, API, sécurité, config) |
 
 ---
 
@@ -103,5 +103,5 @@ Chaque lot ci-dessus correspond à un **milestone GitHub**. Les tâches `⏳` no
 
 - **Milestone « Lot 1 — Page publique »** : CAPTCHA, mesure de performance
 - **Milestone « Lot 2 — Traçabilité »** : purge RGPD 5 ans
-- **Milestone « Lot 3 — Admin »** : flux de remplacement (`replaced`)
+- **Milestone « Lot 3 — Admin »** : ✅ flux de remplacement terminé (aucune issue ouverte)
 - **Milestone « Lot 4 — Déploiement »** : setup-db + seed, test E2E, Vercel, domaine, API scolarité, /api/notify, README

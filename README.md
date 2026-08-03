@@ -37,7 +37,7 @@ Built with **Next.js 16**, **TypeScript**, **Tailwind CSS v4** et **Supabase**.
 | `/api/admin/login` | POST / DELETE | Connexion / déconnexion admin |
 | `/api/admin/releves` | GET / POST | Liste / création des relevés |
 | `/api/admin/releves/[id]` | GET / PATCH / DELETE | Détail / modification / suppression |
-| `/api/admin/releves/[id]/status` | POST | Annulation / remplacement |
+| `/api/admin/releves/[id]/status` | PUT | Annulation / remplacement (validation du remplaçant) |
 | `/api/admin/stats` | GET | Statistiques du dashboard |
 | `/api/admin/verifications` | GET | Historique des vérifications |
 | `/api/admin/verifications/export` | GET | Export CSV (audit) |
@@ -45,6 +45,7 @@ Built with **Next.js 16**, **TypeScript**, **Tailwind CSS v4** et **Supabase**.
 ## Sécurité & anti-fraude
 
 - **Réponses génériques** : un relevé annulé ou inconnu renvoie le même `not_found` (aucun indice au fraudeur)
+- **QR code « éternel »** : une ancienne version remplacée continue de fonctionner — elle affiche la version officielle à jour (fonction SQL `resolve_active_releve`, chaîne `replaced_by`)
 - **Rate limiting** par IP (table `rate_limits`, fenêtre glissante + blocage 5 min)
 - **CAPTCHA Turnstile** avant le rate limiting (les robots ne consomment pas de quota)
 - **Détection de fraude** : ≥ 5 échecs sur un même identifiant en 15 min → email d'alerte à la scolarité/DSI (cooldown 24 h / identifiant)

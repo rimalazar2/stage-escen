@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 /**
@@ -108,9 +109,9 @@ export default function AdminLoginPage() {
 
         {/* Lien retour */}
         <div className="text-center mt-6">
-          <a href="/" className="text-xs text-escen-text-secondary hover:text-escen-cyan transition-colors">
+          <Link href="/" className="text-xs text-escen-text-secondary hover:text-escen-cyan transition-colors">
             ← Retour au site
-          </a>
+          </Link>
         </div>
       </div>
     </div>

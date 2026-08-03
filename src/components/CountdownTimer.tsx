@@ -8,7 +8,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const STORAGE_KEY = "escen_launch_date";
 const DURATION_MS = 60 * 24 * 60 * 60 * 1000; // 60 jours ≈ 2 mois
 const TICK_MS = 1_000;
-const LIVE_ANNOUNCE_INTERVAL = 60;
 
 /* ============================================================
    Types
@@ -120,7 +119,6 @@ export default function CountdownTimer() {
   const [targetTime, setTargetTime] = useState<number | null>(null);
   const [segments, setSegments] = useState<TimeSegments | null>(null);
   const [isLaunched, setIsLaunched] = useState(false);
-  const tickCount = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* --- Read or set launch date --- */
@@ -157,7 +155,6 @@ export default function CountdownTimer() {
     }
 
     setSegments(computeSegments(remaining));
-    tickCount.current++;
   }, [targetTime]);
 
   /* --- Start/stop timer interval --- */
@@ -226,7 +223,8 @@ export default function CountdownTimer() {
   }
 
   /* --- Active Timer State --- */
-  const needsAnnounce = tickCount.current % LIVE_ANNOUNCE_INTERVAL === 0;
+  // Annonce toutes les minutes (quand les secondes repassent à 0)
+  const needsAnnounce = segments!.seconds === 0;
 
   return (
     <div className="relative w-full max-w-[640px]">

@@ -8,13 +8,16 @@ interface VerificationResultProps {
   result: VerifyResponse;
   locale: Locale;
   onReset: () => void;
+  /** Identifiant saisi/scanné — permet d'afficher « version mise à jour » si
+   *  le QR code d'une ancienne version résout vers la version active. */
+  requestedId?: string;
 }
 
 /**
  * Affiche le résultat d'une vérification.
  * Gère tous les cas : succès, annulé, introuvable, rate limité, erreur.
  */
-export default function VerificationResult({ result, locale, onReset }: VerificationResultProps) {
+export default function VerificationResult({ result, locale, onReset, requestedId }: VerificationResultProps) {
   const isFrench = locale === "fr";
 
   // ── Succès : afficher le relevé ──────────────────────────
@@ -24,6 +27,7 @@ export default function VerificationResult({ result, locale, onReset }: Verifica
         <ReleveDisplay
           releve={result.data.releve}
           locale={locale}
+          requestedId={requestedId}
           verifiedAt={new Date().toLocaleString(isFrench ? "fr-FR" : "en-GB")}
         />
         <div className="mt-6 text-center">

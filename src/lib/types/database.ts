@@ -105,7 +105,16 @@ export interface Database {
         Row: Verification;
         Insert: Omit<Verification, "id" | "timestamp">;
         Update: Partial<Omit<Verification, "id">>;
-        Relationships: [];
+        Relationships: [
+          {
+            // Permet le select typé `*, releves!inner(...)` (routes admin logs / export)
+            foreignKeyName: "verifications_releve_id_fkey";
+            columns: ["releve_id"];
+            isOneToOne: false;
+            referencedRelation: "releves";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       admin_logs: {
         Row: AdminLog;

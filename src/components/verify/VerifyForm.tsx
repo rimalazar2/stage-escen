@@ -8,7 +8,7 @@ import type { Locale } from "@/lib/types/database";
 interface VerifyFormProps {
   locale: Locale;
   initialId?: string;
-  onResult: (result: VerifyResponse) => void;
+  onResult: (result: VerifyResponse, attemptedId: string) => void;
 }
 
 // Clé publique Turnstile (sûre côté client). Vide en dev → CAPTCHA désactivé.
@@ -56,7 +56,9 @@ export default function VerifyForm({ locale, initialId = "", onResult }: VerifyF
       });
 
       const data: VerifyResponse = await res.json();
-      onResult(data);
+      // NB: attemptedId transmis pour détecter le cas « ancien QR → version
+      // mise à jour » (chaîne de remplacement).
+      onResult(data, trimmed);
 
       // Jeton mono-usage : invalider après chaque tentative.
       // NB: le message d'erreur (ex: captcha_failed) est affiché par

@@ -11,6 +11,7 @@ import type { VerifyResponse, Locale } from "@/lib/types/database";
  */
 export default function VerifyPage() {
   const [result, setResult] = useState<VerifyResponse | null>(null);
+  const [requestedId, setRequestedId] = useState<string | null>(null);
   const [locale, setLocale] = useState<Locale>("fr");
 
   useEffect(() => {
@@ -46,7 +47,10 @@ export default function VerifyPage() {
             {/* Formulaire */}
             <VerifyForm
               locale={locale}
-              onResult={setResult}
+              onResult={(result, attemptedId) => {
+                setResult(result);
+                setRequestedId(attemptedId);
+              }}
             />
 
             {/* Info QR Code */}
@@ -65,7 +69,11 @@ export default function VerifyPage() {
           <VerificationResult
             result={result}
             locale={locale}
-            onReset={() => setResult(null)}
+            requestedId={requestedId ?? undefined}
+            onReset={() => {
+              setResult(null);
+              setRequestedId(null);
+            }}
           />
         )}
       </div>

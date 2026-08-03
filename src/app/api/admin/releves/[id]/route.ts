@@ -23,8 +23,7 @@ export async function GET(
 
     const { id } = await params;
 
-    // Workaround: cast pour contourner la limitation de typage Supabase SSR
-    const relevesTable = supabase.from("releves") as any;
+    const relevesTable = supabase.from("releves");
 
     const { data: releve, error } = await relevesTable
       .select("*")
@@ -39,15 +38,21 @@ export async function GET(
     }
 
     // Récupérer les vérifications pour ce relevé
-    const verifTable = supabase.from("verifications") as any;
+    const verifTable = supabase.from("verifications");
     const { data: verifications } = await verifTable
       .select("*")
       .eq("releve_id", id)
       .order("timestamp", { ascending: false })
       .limit(50);
 
+    // Récupérer les versions que ce relevé remplace (prédécesseurs)
+    const { data: predecessors } = await relevesTable
+      .select("*")
+      .eq("replaced_by", id)
+      .order("created_at", { ascending: false });
+
     // Log l'action admin
-    const adminLogs = supabase.from("admin_logs") as any;
+    const adminLogs = supabase.from("admin_logs");
     await adminLogs.insert({
       admin_id: user.id,
       admin_email: user.email ?? "",
@@ -58,7 +63,11 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: { releve, verifications: verifications ?? [] },
+      data: {
+        releve,
+        verifications: verifications ?? [],
+        predecessors: predecessors ?? [],
+      },
     });
   } catch {
     return NextResponse.json(

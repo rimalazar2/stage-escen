@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import type { Releve, Verification, ApiResponse } from "@/lib/types/database";
 
@@ -20,16 +20,31 @@ export default function AdminReleveDetailPage({
   const [isLoading, setIsLoading] = useState(true);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [predecessors, setPredecessors] = useState<Releve[]>([]);
+
+  // ── État du flux de remplacement ──
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [candidates, setCandidates] = useState<Releve[]>([]);
+  const [candidateQuery, setCandidateQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedReplacementId, setSelectedReplacementId] = useState<string | null>(null);
+  const [isReplacing, setIsReplacing] = useState(false);
+  const [replaceError, setReplaceError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadReleve() {
       try {
         const res = await fetch(`/api/admin/releves/${id}`);
-        const data: ApiResponse<{ releve: Releve; verifications: Verification[] }> = await res.json();
+        const data: ApiResponse<{
+          releve: Releve;
+          verifications: Verification[];
+          predecessors?: Releve[];
+        }> = await res.json();
 
         if (data.success && data.data) {
           setReleve(data.data.releve);
           setVerifications(data.data.verifications ?? []);
+          setPredecessors(data.data.predecessors ?? []);
         } else {
           router.push("/admin/releves");
         }
@@ -63,6 +78,70 @@ export default function AdminReleveDetailPage({
     } finally {
       setIsCancelling(false);
       setShowCancelConfirm(false);
+    }
+  }
+
+  // ── Flux de remplacement ─────────────────────────────────
+  // Charge les relevés actifs candidats au remplacement (nouvelle version).
+  const loadCandidates = useCallback(async (query: string) => {
+    setIsSearching(true);
+    try {
+      const params = new URLSearchParams({ status: "active", per_page: "15" });
+      if (query.trim()) params.set("q", query.trim());
+      const res = await fetch(`/api/admin/releves?${params}`);
+      const data: ApiResponse<Releve[]> = await res.json();
+      if (data.success && data.data) {
+        setCandidates(data.data.filter((r) => r.id !== id));
+      }
+    } catch {
+      setCandidates([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [id]);
+
+  function openReplaceModal() {
+    setSelectedReplacementId(null);
+    setReplaceError(null);
+    setShowReplaceModal(true);
+    // NB: le chargement des candidats est déclenché par l'effet debounce
+    // (dépendance showReplaceModal) — pas de double requête ici.
+  }
+
+  // Recherche des candidats avec un léger debounce
+  useEffect(() => {
+    if (!showReplaceModal) return;
+    const t = setTimeout(() => loadCandidates(candidateQuery), 300);
+    return () => clearTimeout(t);
+  }, [candidateQuery, showReplaceModal, loadCandidates]);
+
+  async function handleReplace() {
+    if (!releve || !selectedReplacementId) return;
+    setIsReplacing(true);
+    setReplaceError(null);
+
+    try {
+      const res = await fetch(`/api/admin/releves/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "replaced", replaced_by: selectedReplacementId }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setReleve((prev) =>
+          prev
+            ? { ...prev, status: "replaced", replaced_by: selectedReplacementId }
+            : prev
+        );
+        setShowReplaceModal(false);
+      } else {
+        setReplaceError(data.error || "Erreur lors du remplacement.");
+      }
+    } catch {
+      setReplaceError("Erreur de connexion. Veuillez réessayer.");
+    } finally {
+      setIsReplacing(false);
     }
   }
 
@@ -131,6 +210,12 @@ export default function AdminReleveDetailPage({
                 📄 PDF officiel
               </a>
               <button
+                onClick={openReplaceModal}
+                className="px-4 py-2 text-sm font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-xl hover:bg-yellow-100 transition-all duration-160"
+              >
+                Remplacer ce relevé
+              </button>
+              <button
                 onClick={() => setShowCancelConfirm(true)}
                 className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-all duration-160"
               >
@@ -140,6 +225,22 @@ export default function AdminReleveDetailPage({
           )}
         </div>
       </div>
+
+      {/* Bandeau : relevé remplacé (le QR code reste valide) */}
+      {releve.status === "replaced" && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-5 py-4 mb-6 flex items-start gap-3">
+          <span className="text-lg">🔄</span>
+          <div>
+            <p className="text-sm font-bold text-yellow-800">
+              Relevé remplacé — le QR code reste valide
+            </p>
+            <p className="text-xs text-yellow-700/80 mt-0.5">
+              Ce relevé a été remplacé par une nouvelle version. Le QR code déjà imprimé
+              continue de fonctionner : il affiche désormais la version officielle à jour.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Infos du relevé */}
       <div className="bg-white border border-escen-border rounded-xl p-6 mb-6">
@@ -151,7 +252,13 @@ export default function AdminReleveDetailPage({
           <InfoField label="Statut" value={releve.status === "active" ? "Actif" : releve.status === "cancelled" ? "Annulé" : "Remplacé"} />
           <InfoField label="Créé le" value={new Date(releve.created_at).toLocaleDateString("fr-FR")} />
           <InfoField label="Mis à jour le" value={new Date(releve.updated_at).toLocaleDateString("fr-FR")} />
-          {releve.replaced_by && <InfoField label="Remplacé par" value={releve.replaced_by} />}
+          {releve.replaced_by && (
+            <InfoField
+              label="Remplacé par"
+              value={releve.replaced_by}
+              href={`/admin/releves/${releve.replaced_by}`}
+            />
+          )}
         </div>
 
         {/* Notes */}
@@ -183,6 +290,37 @@ export default function AdminReleveDetailPage({
           <p className="text-sm text-escen-text-secondary">Aucune note enregistrée.</p>
         )}
       </div>
+
+      {/* Versions remplacées par ce relevé */}
+      {predecessors.length > 0 && (
+        <div className="bg-white border border-escen-border rounded-xl p-6 mb-6">
+          <h2 className="text-sm font-bold text-escen-navy mb-3">
+            Cette version remplace
+          </h2>
+          <div className="space-y-2">
+            {predecessors.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-escen-cyan-50/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-yellow-500">🔄</span>
+                  <div>
+                    <p className="text-sm font-medium text-escen-navy">{p.student_name}</p>
+                    <p className="text-xs text-escen-text-secondary">{p.promo}</p>
+                  </div>
+                </div>
+                <a
+                  href={`/admin/releves/${p.id}`}
+                  className="text-xs font-semibold text-escen-cyan hover:underline"
+                >
+                  Voir l&apos;ancienne version →
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Historique des vérifications */}
       <div className="bg-white border border-escen-border rounded-xl p-6">
@@ -253,15 +391,100 @@ export default function AdminReleveDetailPage({
           </div>
         </div>
       )}
+
+      {/* Modal de remplacement */}
+      {showReplaceModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-[520px] w-full shadow-xl">
+            <h3 className="text-lg font-bold text-escen-navy mb-1">Remplacer ce relevé</h3>
+            <p className="text-xs text-escen-text-secondary mb-4">
+              Sélectionnez la nouvelle version (déjà créée et active). Le QR code imprimé
+              restera valide et affichera cette version à jour.
+            </p>
+
+            <input
+              type="text"
+              value={candidateQuery}
+              onChange={(e) => setCandidateQuery(e.target.value)}
+              placeholder="Rechercher par nom, n° étudiant, promotion..."
+              className="w-full h-[44px] px-4 text-sm bg-escen-bg border border-escen-border rounded-xl outline-none focus:border-escen-cyan focus:ring-1 focus:ring-escen-cyan/30 mb-3"
+            />
+
+            <div className="max-h-[280px] overflow-y-auto border border-escen-border rounded-xl divide-y divide-escen-border/50">
+              {isSearching ? (
+                <p className="p-4 text-sm text-escen-text-secondary text-center">Recherche...</p>
+              ) : candidates.length === 0 ? (
+                <p className="p-4 text-sm text-escen-text-secondary text-center">
+                  Aucun relevé actif trouvé. Créez d&apos;abord la nouvelle version.
+                </p>
+              ) : (
+                candidates.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedReplacementId(c.id)}
+                    className={`w-full text-left px-4 py-3 transition-colors ${
+                      selectedReplacementId === c.id
+                        ? "bg-escen-cyan-50 border-l-4 border-escen-cyan"
+                        : "hover:bg-escen-cyan-50/50 border-l-4 border-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-escen-navy">{c.student_name}</p>
+                        <p className="text-xs text-escen-text-secondary">{c.promo}</p>
+                      </div>
+                      <span className="text-[0.6rem] font-mono text-escen-text-secondary">
+                        {c.id.slice(0, 8)}…
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {replaceError && (
+              <p role="alert" className="mt-3 text-sm font-medium text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                {replaceError}
+              </p>
+            )}
+
+            <div className="flex gap-3 justify-end mt-5">
+              <button
+                onClick={() => setShowReplaceModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-escen-text-secondary bg-escen-bg border border-escen-border rounded-xl hover:bg-escen-border transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleReplace}
+                disabled={!selectedReplacementId || isReplacing}
+                className="px-4 py-2 text-sm font-semibold text-white bg-yellow-600 rounded-xl hover:bg-yellow-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isReplacing ? "Remplacement..." : "Confirmer le remplacement"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
+function InfoField({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div>
       <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-escen-text-secondary">{label}</p>
-      <p className="text-sm font-medium text-escen-navy break-all">{value}</p>
+      {href ? (
+        <a
+          href={href}
+          title={value}
+          className="text-sm font-medium text-escen-cyan hover:underline break-all"
+        >
+          {value.slice(0, 13)}…
+        </a>
+      ) : (
+        <p className="text-sm font-medium text-escen-navy break-all">{value}</p>
+      )}
     </div>
   );
 }

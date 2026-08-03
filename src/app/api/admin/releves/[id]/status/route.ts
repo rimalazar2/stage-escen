@@ -37,11 +37,11 @@ export async function PUT(
     }
 
     // Vérifier que le relevé existe
-    const { data: existing } = await (supabase
-      .from("releves")
+    const relevesTable = supabase.from("releves");
+    const { data: existing } = await relevesTable
       .select("id, status")
       .eq("id", id)
-      .single() as any);
+      .single();
 
     if (!existing) {
       return NextResponse.json(
@@ -50,12 +50,52 @@ export async function PUT(
       );
     }
 
-    // Mettre à jour le statut
-    const relevesTable = supabase.from("releves") as any;
+    // Seul un relevé actif peut être annulé ou remplacé.
+    // Le statut "active" reste possible (retour en arrière après une erreur).
+    if (status !== "active" && existing.status !== "active") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Seul un relevé actif peut être annulé ou remplacé.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validation du remplacement : le remplaçant doit exister, être actif
+    // et être différent du relevé remplacé (le QR code suivra la chaîne).
+    if (status === "replaced") {
+      if (!replaced_by || replaced_by === id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Veuillez sélectionner le relevé qui remplace celui-ci.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const { data: target } = await relevesTable
+        .select("id, status")
+        .eq("id", replaced_by)
+        .maybeSingle();
+
+      if (!target || target.status !== "active") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Le relevé de remplacement doit être actif.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Mettre à jour le statut (replaced_by remis à NULL hors remplacement)
     const { data: updated, error } = await relevesTable
       .update({
         status,
-        ...(status === "replaced" && replaced_by ? { replaced_by } : {}),
+        ...(status === "replaced" ? { replaced_by } : { replaced_by: null }),
       })
       .eq("id", id)
       .select()
@@ -69,7 +109,7 @@ export async function PUT(
     }
 
     // Log l'action admin
-    await (supabase.from("admin_logs") as any).insert({
+    await supabase.from("admin_logs").insert({
       admin_id: user.id,
       admin_email: user.email ?? "",
       action: status === "cancelled" ? "cancel" : "replace",

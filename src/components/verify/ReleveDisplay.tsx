@@ -7,13 +7,16 @@ interface ReleveDisplayProps {
   releve: Releve;
   locale: Locale;
   verifiedAt: string;
+  /** Identifiant saisi/scanné — si différent de releve.id, c'est qu'un
+   *  ancien QR code affiche la version mise à jour (chaîne de remplacement). */
+  requestedId?: string;
 }
 
 /**
  * Affiche le relevé de notes officiel (version numérique).
  * Utilisé sur la page de vérification après validation de l'identifiant.
  */
-export default function ReleveDisplay({ releve, locale, verifiedAt }: ReleveDisplayProps) {
+export default function ReleveDisplay({ releve, locale, verifiedAt, requestedId }: ReleveDisplayProps) {
   const isFrench = locale === "fr";
 
   return (
@@ -45,6 +48,18 @@ export default function ReleveDisplay({ releve, locale, verifiedAt }: ReleveDisp
             </p>
           </div>
         </div>
+
+        {/* Bandeau : version mise à jour (ancien QR → nouvelle version) */}
+        {requestedId && requestedId !== releve.id && (
+          <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 flex items-center gap-2">
+            <span className="text-lg">🔄</span>
+            <p className="text-sm font-semibold text-yellow-800">
+              {isFrench
+                ? "Ce QR code affiche la version mise à jour de ce document."
+                : "This QR code displays the updated version of this document."}
+            </p>
+          </div>
+        )}
 
         {/* Sceau de vérification */}
         <div className="bg-escen-cyan-50 px-6 py-3 flex items-center gap-2 border-b border-escen-cyan-100">

@@ -96,6 +96,7 @@ export default function VerifyIdPage({
           <VerificationResult
             result={result}
             locale={locale}
+            requestedId={id}
             onReset={() => setResult(null)}
           />
         )}

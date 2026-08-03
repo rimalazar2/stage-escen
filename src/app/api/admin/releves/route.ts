@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Créer le relevé
-    const { data: releve, error } = await (supabase
-      .from("releves") as any)
+    const { data: releve, error } = await supabase
+      .from("releves")
       .insert({
         student_name,
         student_id,
@@ -119,6 +119,8 @@ export async function POST(request: NextRequest) {
         moyenne: moyenne ?? 0,
         mention: mention ?? "",
         status: "active",
+        pdf_url: "",
+        replaced_by: null,
       })
       .select()
       .single();
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log l'action admin
-    await (supabase.from("admin_logs") as any).insert({
+    await supabase.from("admin_logs").insert({
       admin_id: user.id,
       admin_email: user.email ?? "",
       action: "create",
