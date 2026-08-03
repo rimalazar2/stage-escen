@@ -1,6 +1,6 @@
 # 📋 Suivi du projet — ESCEN · Vérification sécurisée des relevés
 
-> **Dernière mise à jour : 03/08/2026 (session : flux de remplacement « QR code éternel »)**
+> **Dernière mise à jour : 03/08/2026 (session : flux de remplacement « QR code éternel » + nettoyage lint) — commit `07c4b0b`**
 > Ce fichier est la **source de vérité** de l'avancement. Il est mis à jour à chaque fin de session.
 > Légende : ✅ Fait · 🔄 En cours · ⏳ À faire · 🚫 Bloqué
 
@@ -62,6 +62,7 @@
 | **Seed des données de test** | ✅ | `npm run seed` OK (6 étudiants + admin + 7 vérifications) |
 | Test de bout en bout (création → QR → vérif → alerte) | ✅ | API validée : ID valide → succès, ID invalide/court/annulé → `not_found` générique |
 | Build de production | ✅ | `npm run build` OK (toutes routes compilées) |
+| Lint & typecheck | ✅ | `npm run lint` : **0 problème** (37 → 0 — suppression des casts `as any` par typage réel, correction `react-hooks/refs`, `<Link>` login, entités échappées, code mort supprimé) + `tsc --noEmit` : **0 erreur** |
 | Déploiement Vercel + domaine `verif.escen-university.fr` | ⏳ | Domaine décidé, réservation à confirmer |
 | Vérification domaine Resend (`alerts@escen-university.fr`) | ⏳ | En production uniquement (dev : `onboarding@resend.dev` ne livre qu'à l'adresse du compte — **testé**) |
 | Récupération automatique des relevés (API scolarité) | ⏳ | Nécessite un échange avec l'équipe scolarité |
@@ -105,3 +106,12 @@ Chaque lot ci-dessus correspond à un **milestone GitHub**. Les tâches `⏳` no
 - **Milestone « Lot 2 — Traçabilité »** : purge RGPD 5 ans
 - **Milestone « Lot 3 — Admin »** : ✅ flux de remplacement terminé (aucune issue ouverte)
 - **Milestone « Lot 4 — Déploiement »** : setup-db + seed, test E2E, Vercel, domaine, API scolarité, /api/notify, README
+
+---
+
+## 🗓️ Journal des sessions
+
+| Date | Contenu | Commit |
+|---|---|---|
+| 03/08/2026 | Flux de remplacement « QR code éternel » (`resolve_active_releve`, test E2E 6/6, bouton « Remplacer » admin, bandeau « version mise à jour ») + **nettoyage lint complet (37 → 0)** + génération du CR JOURNÉE 3 | `07c4b0b` |
+| 01/08/2026 | Alerte anti-fraude testée (email Resend délivré), CAPTCHA Turnstile, purge RGPD 5 ans, setup-db + seed | — |
