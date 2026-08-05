@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import DataTable from "@/components/admin/DataTable";
 import CreateReleveForm from "@/components/admin/CreateReleveForm";
+import Icon from "@/components/Icon";
 import type { Releve, ApiResponse } from "@/lib/types/database";
 
 /**
@@ -76,20 +77,26 @@ export default function AdminRelevesPage() {
     {
       key: "status",
       label: "Statut",
-      render: (r: Releve) => (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${
-          r.status === "active"
-            ? "bg-green-50 text-green-700"
-            : r.status === "cancelled"
+      render: (r: Releve) => {
+        // Un relevé actif peut être verrouillé (consultation suspendue)
+        const locked = r.status === "active" && Boolean(r.locked_at);
+        return (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${
+            r.status === "cancelled"
               ? "bg-red-50 text-red-600"
-              : "bg-yellow-50 text-yellow-700"
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${
-            r.status === "active" ? "bg-green-500" : r.status === "cancelled" ? "bg-red-500" : "bg-yellow-500"
-          }`} />
-          {r.status === "active" ? "Actif" : r.status === "cancelled" ? "Annulé" : "Remplacé"}
-        </span>
-      ),
+              : r.status === "replaced"
+                ? "bg-yellow-50 text-yellow-700"
+                : locked
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-green-50 text-green-700"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              r.status === "cancelled" ? "bg-red-500" : r.status === "replaced" ? "bg-yellow-500" : locked ? "bg-amber-500" : "bg-green-500"
+            }`} />
+            {r.status === "cancelled" ? "Annulé" : r.status === "replaced" ? "Remplacé" : locked ? "Verrouillé" : "Actif"}
+          </span>
+        );
+      },
     },
     {
       key: "created_at",
@@ -110,7 +117,14 @@ export default function AdminRelevesPage() {
           onClick={() => setShowCreateForm(!showCreateForm)}
           className="px-4 py-2 text-sm font-semibold text-white bg-escen-navy rounded-xl hover:bg-escen-navy-500 transition-all duration-160"
         >
-          {showCreateForm ? "Fermer" : "+ Nouveau relevé"}
+          {showCreateForm ? (
+            "Fermer"
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="add" size={18} />
+              Nouveau relevé
+            </span>
+          )}
         </button>
       </div>
 
@@ -141,8 +155,9 @@ export default function AdminRelevesPage() {
             />
           </div>
           <div className="flex-1 text-center sm:text-left">
-            <p className="text-sm font-bold text-green-700 mb-1">
-              ✅ Relevé créé — {createdReleve.student_name}
+            <p className="text-sm font-bold text-green-700 mb-1 flex items-center justify-center sm:justify-start gap-1.5">
+              <Icon name="check_circle" size={18} className="text-green-600" />
+              Relevé créé — {createdReleve.student_name}
             </p>
             <p className="text-xs text-green-700/80 mb-3 break-all">
               {typeof window !== "undefined"
@@ -154,23 +169,26 @@ export default function AdminRelevesPage() {
                 href={`/api/releve/${createdReleve.id}/pdf`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 text-xs font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors inline-flex items-center gap-1.5"
               >
-                📄 Télécharger le PDF officiel
+                <Icon name="description" size={15} />
+                Télécharger le PDF officiel
               </a>
               <a
                 href={`/verify/${createdReleve.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 text-xs font-semibold text-green-700 bg-white border border-green-300 rounded-xl hover:bg-green-50 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-green-700 bg-white border border-green-300 rounded-xl hover:bg-green-50 transition-colors inline-flex items-center gap-1.5"
               >
-                🔗 Page de vérification
+                <Icon name="link" size={15} />
+                Page de vérification
               </a>
               <button
                 onClick={() => setCreatedReleve(null)}
-                className="px-4 py-2 text-xs font-semibold text-green-700/70 hover:text-green-800 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-green-700/70 hover:text-green-800 transition-colors inline-flex items-center gap-1"
               >
-                ✕ Fermer
+                <Icon name="close" size={16} />
+                Fermer
               </button>
             </div>
           </div>

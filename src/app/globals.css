@@ -128,6 +128,23 @@ body::before {
   border-radius: 6px;
 }
 
+/* ============================================================
+   Consultation uniquement (document protégé)
+   ============================================================ */
+
+/* Bloque la sauvegarde par appui long sur mobile (iOS/Android) —
+   la sélection est déjà désactivée côté Tailwind (select-none) */
+.releve-protected {
+  -webkit-touch-callout: none;
+}
+
+/* Impression / « Enregistrer en PDF » → document masqué (page vierge) */
+@media print {
+  .releve-protected {
+    display: none !important;
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
 

@@ -2,17 +2,19 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import Icon, { type IconName } from "@/components/Icon";
 
 interface NavItem {
   label: string;
   href: string;
-  icon: string;
+  icon: IconName;
 }
 
 const navItems: NavItem[] = [
-  { label: "Tableau de bord", href: "/admin/dashboard", icon: "📊" },
-  { label: "Relevés", href: "/admin/releves", icon: "📄" },
-  { label: "Historique", href: "/admin/logs", icon: "📜" },
+  { label: "Tableau de bord", href: "/admin/dashboard", icon: "space_dashboard" },
+  { label: "Relevés", href: "/admin/releves", icon: "description" },
+  { label: "Historique", href: "/admin/logs", icon: "history" },
+  { label: "Alertes fraude", href: "/admin/fraude", icon: "security" },
 ];
 
 /**
@@ -96,7 +98,7 @@ export default function AdminSidebar() {
                   }
                 `}
               >
-                <span className="text-base">{item.icon}</span>
+                <Icon name={item.icon} size={20} />
                 {item.label}
               </a>
             );
@@ -109,7 +111,7 @@ export default function AdminSidebar() {
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all duration-160 w-full"
           >
-            <span className="text-base">🚪</span>
+            <Icon name="logout" size={20} />
             Déconnexion
           </button>
         </div>

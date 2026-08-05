@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import VerifyForm from "@/components/verify/VerifyForm";
 import VerificationResult from "@/components/verify/VerificationResult";
+import { detectAutomationClient } from "@/lib/bot-detection";
 import type { VerifyResponse, Locale } from "@/lib/types/database";
 
 /**
@@ -35,7 +36,7 @@ export default function VerifyIdPage({
           const res = await fetch("/api/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id }),
+            body: JSON.stringify({ id, clientSignals: detectAutomationClient() }),
           });
           const data: VerifyResponse = await res.json();
           setResult(data);

@@ -25,7 +25,7 @@ const en: Translations = {
   },
 
   result: {
-    valid_title: "✅ Authenticated transcript",
+    valid_title: "Authenticated transcript",
     valid_description:
       "This transcript was issued by ESCEN University and is authentic.",
     not_found_title: "Unrecognized ID",
@@ -49,7 +49,6 @@ const en: Translations = {
     credit: "Credits",
     note: "Grade",
     verified_at: "Verified on",
-    download: "Download PDF",
   },
 
   admin: {

@@ -24,12 +24,14 @@ export type Releve = {
   id: string;
   student_name: string;
   student_id: string;
+  student_email: string;
   promo: string;
   notes_data: ReleveNote[];
   mention: string;
   moyenne: number;
   pdf_url: string;
   status: ReleveStatus;
+  locked_at: string | null;
   created_at: string;
   updated_at: string;
   replaced_by: string | null;
@@ -38,12 +40,17 @@ export type Releve = {
 // ─── Vérification ───────────────────────────────────────────
 export type Verification = {
   id: string;
+  /** Miroir texte de l'id (colonne générée) — permet la recherche ilike
+   *  de la référence affichée dans le filigrane anti-capture. */
+  id_text: string;
   releve_id: string | null;
   attempted_id: string;
   ip_address: string;
   user_agent: string;
   result: VerificationResult;
   error_type: string;
+  /** Signaux de détection d'automatisation (webdriver, headless_ua, …) */
+  signals: string[];
   timestamp: string;
 };
 
@@ -91,6 +98,14 @@ export type NotifySubscriber = {
   created_at: string;
 };
 
+// ─── Marqueurs d'envoi d'emails périodiques (digest quotidien) ─
+export type EmailDigest = {
+  digest_type: string;
+  /** Fin de la période couverte par le dernier envoi (début de la suivante) */
+  period_end: string;
+  sent_at: string;
+};
+
 // ─── Supabase Database type ──────────────────────────────────
 export interface Database {
   public: {
@@ -103,8 +118,11 @@ export interface Database {
       };
       verifications: {
         Row: Verification;
-        Insert: Omit<Verification, "id" | "timestamp">;
-        Update: Partial<Omit<Verification, "id">>;
+        // NB: id optionnel à l'insertion — la base le génère (gen_random_uuid),
+        // mais /api/verify fournit le sien pour la traçabilité du filigrane.
+        // id_text est généré par la base (GENERATED ALWAYS) — non insérable.
+        Insert: Omit<Verification, "id" | "id_text" | "timestamp"> & { id?: string };
+        Update: Partial<Omit<Verification, "id" | "id_text">>;
         Relationships: [
           {
             // Permet le select typé `*, releves!inner(...)` (routes admin logs / export)
@@ -146,6 +164,12 @@ export interface Database {
         Update: Partial<Omit<NotifySubscriber, "id">>;
         Relationships: [];
       };
+      email_digests: {
+        Row: EmailDigest;
+        Insert: EmailDigest;
+        Update: Partial<EmailDigest>;
+        Relationships: [];
+      };
     };
     // NB: l'overload Views de from() est déclarée après celle de Tables,
     // donc un Record<string, never> ne piège pas les noms de tables.
@@ -165,11 +189,14 @@ export interface VerifyResponse {
   success: boolean;
   data?: {
     releve: Releve;
+    /** Identifiant de la vérification enregistrée — référence de traçabilité
+     *  utilisée dans le filigrane anti-capture (consultable dans l'historique). */
+    verificationId?: string;
   };
   error?: {
     // NB: un relevé annulé renvoie "not_found" (anti-fraude : indistinguable
     // d'un identifiant inconnu pour le public).
-    code: "not_found" | "rate_limited" | "server_error" | "captcha_failed";
+    code: "not_found" | "rate_limited" | "server_error" | "captcha_failed" | "bot_detected" | "locked";
     message: string;
   };
 }

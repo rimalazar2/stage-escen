@@ -24,7 +24,7 @@ const fr = {
 
   // ─── Résultat de vérification ────────────────────────────
   result: {
-    valid_title: "✅ Relevé authentifié",
+    valid_title: "Relevé authentifié",
     valid_description: "Ce relevé de notes a été émis par ESCEN University et est authentique.",
     not_found_title: "Identifiant non reconnu",
     not_found_description: "Aucun relevé ne correspond à cet identifiant. Vérifiez le code saisi.",
@@ -45,7 +45,6 @@ const fr = {
     credit: "Crédits",
     note: "Note",
     verified_at: "Vérifié le",
-    download: "Télécharger le PDF",
   },
 
   // ─── Admin ───────────────────────────────────────────────

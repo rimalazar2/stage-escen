@@ -29,21 +29,25 @@ CREATE TABLE IF NOT EXISTS releves (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_name  TEXT NOT NULL,
   student_id    TEXT NOT NULL UNIQUE,          -- numéro étudiant interne
+  student_email TEXT NOT NULL DEFAULT '',      -- email de notification (obligatoire au formulaire)
   promo         TEXT NOT NULL DEFAULT '',      -- ex: "Licence 3 2025-2026"
   notes_data    JSONB NOT NULL DEFAULT '[]'::jsonb,  -- [{matiere, note, credit, mention}]
   mention       TEXT DEFAULT '',               -- mention obtenue
   moyenne       NUMERIC(4,2) DEFAULT 0,        -- moyenne générale
   pdf_url       TEXT DEFAULT '',
   status        releve_status NOT NULL DEFAULT 'active',
+  locked_at     TIMESTAMPTZ DEFAULT NULL,      -- verrouillage temporaire (non-null = indisponible)
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   replaced_by   UUID DEFAULT NULL              -- si remplacé, lien vers le nouveau
 );
 
--- Compatibilité : la table releves peut exister sans la colonne replaced_by
--- (créée avant la fonctionnalité remplacement). Même pattern idempotent que
--- attempted_id ci-dessous.
+-- Compatibilité : la table releves peut exister sans les colonnes récentes
+-- (créée avant la fonctionnalité correspondante). Pattern idempotent :
+-- ALTER TABLE ADD COLUMN IF NOT EXISTS (ne fait rien si la colonne existe).
 ALTER TABLE releves ADD COLUMN IF NOT EXISTS replaced_by UUID DEFAULT NULL;
+ALTER TABLE releves ADD COLUMN IF NOT EXISTS student_email TEXT NOT NULL DEFAULT '';
+ALTER TABLE releves ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ DEFAULT NULL;
 
 -- Index pour recherche rapide
 CREATE INDEX IF NOT EXISTS idx_releves_student_name ON releves USING gin (to_tsvector('french', student_name));
@@ -59,15 +63,20 @@ CREATE TABLE IF NOT EXISTS verifications (
   ip_address    TEXT NOT NULL DEFAULT '',      -- hashée (RGPD)
   user_agent    TEXT NOT NULL DEFAULT '',
   result        verification_result NOT NULL,
-  error_type    TEXT DEFAULT '',               -- 'invalid_id', 'cancelled', 'rate_limited'
+  error_type    TEXT DEFAULT '',               -- 'invalid_id', 'cancelled', 'rate_limited', 'locked', 'bot_detected'
+  signals       TEXT[] NOT NULL DEFAULT '{}',  -- signaux détectés (webdriver, headless_ua, …)
+  id_text       TEXT GENERATED ALWAYS AS (id::text) STORED,  -- miroir texte de l'id (recherche ilike)
   timestamp     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Compatibilité : la table verifications peut exister sans la colonne
--- attempted_id (créée avant la version anti-fraude). CREATE TABLE IF NOT
--- EXISTS ne modifie pas une table existante → on ajoute la colonne en
--- idempotent (ne fait rien si elle existe déjà).
+-- Compatibilité : la table verifications peut exister sans les colonnes
+-- récentes (créée avant la version anti-fraude / journalisation enrichie).
+-- CREATE TABLE IF NOT EXISTS ne modifie pas une table existante → on ajoute
+-- les colonnes en idempotent (ne fait rien si elles existent déjà).
 ALTER TABLE verifications ADD COLUMN IF NOT EXISTS attempted_id TEXT DEFAULT '';
+ALTER TABLE verifications ADD COLUMN IF NOT EXISTS signals TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE verifications ADD COLUMN IF NOT EXISTS id_text TEXT GENERATED ALWAYS AS (id::text) STORED;
+CREATE INDEX IF NOT EXISTS idx_verifications_id_text ON verifications (id_text);
 
 -- Index pour requêtes d'audit
 CREATE INDEX IF NOT EXISTS idx_verifications_releve_id ON verifications (releve_id);
@@ -134,6 +143,29 @@ CREATE TABLE IF NOT EXISTS notify_subscribers (
 CREATE INDEX IF NOT EXISTS idx_notify_subscribers_created_at ON notify_subscribers (created_at DESC);
 
 ALTER TABLE notify_subscribers ENABLE ROW LEVEL SECURITY;
+
+-- ─── Table : marqueurs d'emails périodiques (digest quotidien) ──
+-- Une ligne par type d'email périodique (ex: 'verification_digest').
+-- Le digest admin est envoyé au plus une fois toutes les 24 h ; le
+-- marqueur évite les doublons sans dépendre d'un cron externe (fonctionne
+-- aussi en dev / sur Vercel sans job planifié). Accès service role uniquement.
+CREATE TABLE IF NOT EXISTS email_digests (
+  digest_type  TEXT PRIMARY KEY,
+  period_end   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- fin de la période couverte
+  sent_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Renommage idempotent (la colonne s'appelait period_start au tout début)
+DO $digest$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_digests'
+      AND column_name = 'period_start'
+  ) THEN
+    ALTER TABLE email_digests RENAME COLUMN period_start TO period_end;
+  END IF;
+END $digest$;
 
 -- ─── Table : rôles administrateurs ───────────────────────────
 -- Référence qui utilisateur Supabase a quel rôle.

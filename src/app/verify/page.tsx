@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import VerifyForm from "@/components/verify/VerifyForm";
 import VerificationResult from "@/components/verify/VerificationResult";
+import Icon from "@/components/Icon";
 import type { VerifyResponse, Locale } from "@/lib/types/database";
 
 /**
@@ -56,7 +57,7 @@ export default function VerifyPage() {
             {/* Info QR Code */}
             <div className="mt-12 text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-escen-cyan-50 rounded-xl border border-escen-cyan-100">
-                <span className="text-lg">📱</span>
+                <Icon name="smartphone" size={18} className="text-escen-cyan" />
                 <p className="text-xs text-escen-text-secondary">
                   {locale === "fr"
                     ? "Scannez le QR Code sur votre relevé pour une vérification instantanée."

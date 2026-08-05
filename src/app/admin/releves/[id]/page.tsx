@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
+import Icon from "@/components/Icon";
 import type { Releve, Verification, ApiResponse } from "@/lib/types/database";
 
 /**
@@ -20,6 +21,7 @@ export default function AdminReleveDetailPage({
   const [isLoading, setIsLoading] = useState(true);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isLocking, setIsLocking] = useState(false);
   const [predecessors, setPredecessors] = useState<Releve[]>([]);
 
   // ── État du flux de remplacement ──
@@ -57,6 +59,32 @@ export default function AdminReleveDetailPage({
 
     loadReleve();
   }, [id, router]);
+
+  async function handleLockToggle() {
+    if (!releve) return;
+    setIsLocking(true);
+
+    try {
+      const res = await fetch(`/api/admin/releves/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lock: !releve.locked_at }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setReleve((prev) =>
+          prev
+            ? { ...prev, locked_at: prev.locked_at ? null : new Date().toISOString() }
+            : prev
+        );
+      }
+    } catch {
+      // Erreur silencieuse
+    } finally {
+      setIsLocking(false);
+    }
+  }
 
   async function handleCancel() {
     if (!releve) return;
@@ -207,18 +235,38 @@ export default function AdminReleveDetailPage({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-escen-navy bg-white border border-escen-border rounded-xl hover:border-escen-cyan hover:text-escen-cyan transition-all duration-160"
               >
-                📄 PDF officiel
+                <Icon name="description" size={16} />
+                PDF officiel
               </a>
               <button
-                onClick={openReplaceModal}
-                className="px-4 py-2 text-sm font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-xl hover:bg-yellow-100 transition-all duration-160"
+                onClick={handleLockToggle}
+                disabled={isLocking}
+                className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-160 inline-flex items-center gap-1.5 disabled:opacity-60 ${
+                  releve.locked_at
+                    ? "text-green-700 bg-green-50 border border-green-200 hover:bg-green-100"
+                    : "text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100"
+                }`}
               >
+                <Icon
+                  name={releve.locked_at ? "lock_open" : "lock"}
+                  size={16}
+                />
+                {releve.locked_at
+                  ? (isLocking ? "Déverrouillage..." : "Déverrouiller")
+                  : (isLocking ? "Verrouillage..." : "Verrouiller le document")}
+              </button>
+              <button
+                onClick={openReplaceModal}
+                className="px-4 py-2 text-sm font-semibold text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-xl hover:bg-yellow-100 transition-all duration-160 inline-flex items-center gap-1.5"
+              >
+                <Icon name="sync" size={16} />
                 Remplacer ce relevé
               </button>
               <button
                 onClick={() => setShowCancelConfirm(true)}
-                className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-all duration-160"
+                className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-all duration-160 inline-flex items-center gap-1.5"
               >
+                <Icon name="block" size={16} />
                 Annuler ce relevé
               </button>
             </>
@@ -226,10 +274,27 @@ export default function AdminReleveDetailPage({
         </div>
       </div>
 
+      {/* Bandeau : document verrouillé */}
+      {releve.locked_at && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-6 flex items-start gap-3">
+          <Icon name="lock" size={20} className="text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-amber-800">
+              Document verrouillé — consultation suspendue
+            </p>
+            <p className="text-xs text-amber-700/80 mt-0.5">
+              Les visiteurs voient un message « Document temporairement indisponible ».
+              Le document reste valide : déverrouillez-le pour rétablir la consultation.
+              (Verrouillé le {new Date(releve.locked_at).toLocaleString("fr-FR")})
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Bandeau : relevé remplacé (le QR code reste valide) */}
       {releve.status === "replaced" && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-5 py-4 mb-6 flex items-start gap-3">
-          <span className="text-lg">🔄</span>
+          <Icon name="sync" size={20} className="text-yellow-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-bold text-yellow-800">
               Relevé remplacé — le QR code reste valide
@@ -247,9 +312,21 @@ export default function AdminReleveDetailPage({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <InfoField label="ID Relevé" value={releve.id} />
           <InfoField label="N° Étudiant" value={releve.student_id} />
+          <InfoField label="Email étudiant" value={releve.student_email || "—"} />
           <InfoField label="Moyenne" value={releve.moyenne > 0 ? releve.moyenne.toFixed(2) : "—"} />
           <InfoField label="Mention" value={releve.mention || "—"} />
-          <InfoField label="Statut" value={releve.status === "active" ? "Actif" : releve.status === "cancelled" ? "Annulé" : "Remplacé"} />
+          <InfoField
+            label="Statut"
+            value={
+              releve.status === "cancelled"
+                ? "Annulé"
+                : releve.status === "replaced"
+                  ? "Remplacé"
+                  : releve.locked_at
+                    ? "Verrouillé"
+                    : "Actif"
+            }
+          />
           <InfoField label="Créé le" value={new Date(releve.created_at).toLocaleDateString("fr-FR")} />
           <InfoField label="Mis à jour le" value={new Date(releve.updated_at).toLocaleDateString("fr-FR")} />
           {releve.replaced_by && (
@@ -304,7 +381,7 @@ export default function AdminReleveDetailPage({
                 className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-escen-cyan-50/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-yellow-500">🔄</span>
+                  <Icon name="sync" size={20} className="text-yellow-500" />
                   <div>
                     <p className="text-sm font-medium text-escen-navy">{p.student_name}</p>
                     <p className="text-xs text-escen-text-secondary">{p.promo}</p>
@@ -336,9 +413,11 @@ export default function AdminReleveDetailPage({
                 className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-escen-cyan-50/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <span className={v.result === "success" ? "text-green-500" : "text-red-400"}>
-                    {v.result === "success" ? "✅" : "❌"}
-                  </span>
+                  <Icon
+                    name={v.result === "success" ? "check_circle" : "cancel"}
+                    size={20}
+                    className={v.result === "success" ? "text-green-500" : "text-red-400"}
+                  />
                   <div>
                     <p className="text-xs text-escen-text-secondary">
                       {new Date(v.timestamp).toLocaleString("fr-FR")}

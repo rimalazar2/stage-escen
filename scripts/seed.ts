@@ -40,6 +40,7 @@ interface SeedReleve {
   id: string;
   student_name: string;
   student_id: string;
+  student_email: string;
   promo: string;
   notes_data: Array<{
     matiere: string;
@@ -58,6 +59,7 @@ const STUDENTS: SeedReleve[] = [
     id: UUIDS.DUPONT,
     student_name: "Léa Dupont",
     student_id: "ESC2024001",
+    student_email: "lea.dupont@example.com",
     promo: "Licence 3 — Commerce International",
     moyenne: 14.75,
     mention: "Bien",
@@ -77,6 +79,7 @@ const STUDENTS: SeedReleve[] = [
     id: UUIDS.MARTIN,
     student_name: "Thomas Martin",
     student_id: "ESC2024002",
+    student_email: "thomas.martin@example.com",
     promo: "Master 1 — Finance & Banque",
     moyenne: 16.25,
     mention: "Très bien",
@@ -95,6 +98,7 @@ const STUDENTS: SeedReleve[] = [
     id: UUIDS.LEFEVRE,
     student_name: "Camille Lefèvre",
     student_id: "ESC2024003",
+    student_email: "camille.lefevre@example.com",
     promo: "Bachelor 2 — Ressources Humaines",
     moyenne: 12.33,
     mention: "Assez bien",
@@ -113,6 +117,7 @@ const STUDENTS: SeedReleve[] = [
     id: UUIDS.PETIT,
     student_name: "Hugo Petit",
     student_id: "ESC2024004",
+    student_email: "hugo.petit@example.com",
     promo: "Licence 3 — Économie Numérique",
     moyenne: 17.50,
     mention: "Très bien",
@@ -131,6 +136,7 @@ const STUDENTS: SeedReleve[] = [
     id: UUIDS.ROUSSEL,
     student_name: "Sarah Roussel",
     student_id: "ESC2024005",
+    student_email: "sarah.roussel@example.com",
     promo: "Master 2 — Entrepreneuriat",
     moyenne: 13.80,
     mention: "Bien",
@@ -150,6 +156,7 @@ const STUDENTS: SeedReleve[] = [
     id: UUIDS.BERNARD,
     student_name: "Antoine Bernard",
     student_id: "ESC2024006",
+    student_email: "antoine.bernard@example.com",
     promo: "Licence 2 — Gestion",
     moyenne: 9.50,
     mention: "",
@@ -278,6 +285,7 @@ async function seed() {
       id: student.id,
       student_name: student.student_name,
       student_id: student.student_id,
+      student_email: student.student_email,
       promo: student.promo,
       notes_data: student.notes_data,
       mention: student.mention,

@@ -94,16 +94,24 @@ export async function POST(request: NextRequest) {
     const {
       student_name,
       student_id,
+      student_email,
       promo,
       notes_data,
       moyenne,
       mention,
     } = body;
 
-    // Validation
+    // Validation (l'email étudiant est obligatoire : notifications)
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!student_name || !student_id) {
       return NextResponse.json(
         { success: false, error: "Nom étudiant et identifiant requis." },
+        { status: 400 }
+      );
+    }
+    if (typeof student_email !== "string" || !EMAIL_REGEX.test(student_email.trim())) {
+      return NextResponse.json(
+        { success: false, error: "Email étudiant invalide." },
         { status: 400 }
       );
     }
@@ -114,6 +122,7 @@ export async function POST(request: NextRequest) {
       .insert({
         student_name,
         student_id,
+        student_email: student_email.trim().toLowerCase(),
         promo: promo ?? "",
         notes_data: notes_data ?? [],
         moyenne: moyenne ?? 0,
@@ -121,6 +130,7 @@ export async function POST(request: NextRequest) {
         status: "active",
         pdf_url: "",
         replaced_by: null,
+        locked_at: null,
       })
       .select()
       .single();

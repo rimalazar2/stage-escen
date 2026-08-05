@@ -1,9 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { sendFraudAlert } from "@/lib/resend";
+import {
+  sendFraudAlert,
+  sendStudentVerificationNotification,
+} from "@/lib/resend";
+import { sendVerificationDigestIfDue } from "@/lib/digests";
 import { isTurnstileEnabled, verifyTurnstileToken } from "@/lib/turnstile";
-import { resolveActiveReleve } from "@/lib/releves";
+import { analyzeBotRisk } from "@/lib/bot-detection";
+import { resolveActiveReleve, toPublicReleve } from "@/lib/releves";
 import type { Database } from "@/lib/types/database";
 import crypto from "crypto";
 
@@ -11,6 +16,13 @@ import crypto from "crypto";
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
 const RATE_LIMIT_BLOCK_MS = 300_000; // 5 minutes
+
+// ─── Configuration détection automatisation / scraping ──────
+// Blocage court (même durée que le rate limit) : un bot détecté est déjà
+// refusé à chaque requête ; un blocage long punirait à tort les visiteurs
+// légitimes derrière une IP partagée (NAT, campus, proxy d'entreprise).
+const BOT_BLOCK_MS = 300_000; // 5 minutes
+const BOT_ATTEMPT_COUNT = 99; // compteur arbitraire (> seuil) pour la ligne de blocage
 
 // ─── Configuration détection fraude ──────────────────────────
 const FRAUD_THRESHOLD = 5; // tentatives échouées sur un même identifiant
@@ -130,16 +142,28 @@ async function logVerification(
     user_agent: string;
     result: "success" | "failed";
     error_type: string;
-  }
-) {
+    /** Signaux de détection d'automatisation (journalisation enrichie) */
+    signals?: string[];
+  },
+  /** Identifiant pré-généré (utile pour récupérer l'ID sans relecture) */
+  id?: string
+): Promise<string | null> {
+  // NB: pas de `.select("id")` exploitable ici — la RLS autorise le public à
+  // INSÉRER une vérification mais pas à la RELIRE ; un select retomberait à
+  // null. On passe donc l'identifiant pré-généré quand il est nécessaire.
   await supabase.from("verifications").insert({
+    // NB: spread conditionnel — le type Insert de la table n'a pas de champ
+    // `id` (généré côté base) ; on ne l'ajoute que s'il est pré-fourni.
+    ...(id ? { id } : {}),
     releve_id: params.releve_id,
     attempted_id: params.attempted_id ?? "",
     ip_address: params.ip_address,
     user_agent: params.user_agent,
     result: params.result,
     error_type: params.error_type,
+    signals: params.signals ?? [],
   });
+  return id ?? null;
 }
 
 /**
@@ -168,6 +192,11 @@ async function detectFraudAndAlert(
       .eq("attempted_id", identifier)
       .eq("result", "failed")
       .neq("error_type", "captcha_failed")
+      .neq("error_type", "bot_detected")
+      // NB: un document verrouillé échoue toujours par définition — des
+      // tentatives répétées dessus (étudiants curieux) ne sont pas de la
+      // fraude, seulement du bruit.
+      .neq("error_type", "locked")
       .gte("timestamp", since);
 
     if (!count || count < FRAUD_THRESHOLD) return;
@@ -215,17 +244,67 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
+    // ── Récapitulatif quotidien (admin) ────────────────────
+    // Planifié pour TOUTES les tentatives, réussies comme échouées : une
+    // journée d'attaque sans aucun succès doit quand même être signalée à
+    // l'administration. Le garde 24 h (table email_digests) évite les
+    // doublons ; exécution post-réponse via after() (jamais bloquant).
+    after(async () => {
+      const adminSupabase = await createAdminClient().catch(() => null);
+      if (adminSupabase) {
+        await sendVerificationDigestIfDue(adminSupabase, new Date());
+      }
+    });
+
     // ── CAPTCHA anti-robot (Turnstile) ─────────────────────
     // Désactivé en dev (pas de clés) ; en prod, un jeton valide est requis
     // AVANT le rate limiting : les robots rejetés ne consomment pas de quota.
     const body = await request.json().catch(() => ({}));
-    const { id, turnstileToken } = body as { id?: string; turnstileToken?: string };
+    const { id, turnstileToken, clientSignals } = body as {
+      id?: string;
+      turnstileToken?: string;
+      clientSignals?: unknown;
+    };
 
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       request.headers.get("x-real-ip") ??
       "unknown";
     const ipHash = hashIP(ip);
+
+    // ── Détection d'outils d'automatisation / scraping ─────
+    // Défense en profondeur : Turnstile gère les robots « visibles », cette
+    // couche repère les appels scriptés (headless, webdriver, UA scraper,
+    // payload client absent). Un bot détecté est journalisé et son IP bloquée
+    // pendant 1 h (rate_limits) — les tentatives suivantes seront refusées.
+    const botRisk = analyzeBotRisk(
+      request.headers.get("user-agent") ?? "",
+      clientSignals
+    );
+    if (botRisk.blocked) {
+      // Observabilité : journal serveur des signaux qui ont déclenché le refus
+      // (utile pour régler la précision du détecteur sans toucher la base).
+      console.warn("[bot-detection] Refusé :", botRisk.signals, { ipHash });
+
+      await logVerification(supabase, {
+        releve_id: null,
+        attempted_id: typeof id === "string" ? id : "",
+        ip_address: ipHash,
+        user_agent: request.headers.get("user-agent") ?? "",
+        result: "failed",
+        error_type: "bot_detected",
+        signals: botRisk.signals,
+      });
+
+      await blockIp(supabase, ipHash);
+
+      await delay(Math.max(0, 200 - (Date.now() - startTime)));
+
+      return NextResponse.json(
+        { success: false, error: { code: "bot_detected", message: "" } },
+        { status: 403 }
+      );
+    }
 
     if (isTurnstileEnabled()) {
       const captchaOk = await verifyTurnstileToken(turnstileToken, ip);
@@ -238,6 +317,7 @@ export async function POST(request: NextRequest) {
           user_agent: request.headers.get("user-agent") ?? "",
           result: "failed",
           error_type: "captcha_failed",
+          signals: botRisk.signals,
         });
 
         await delay(Math.max(0, 200 - (Date.now() - startTime)));
@@ -258,6 +338,7 @@ export async function POST(request: NextRequest) {
         user_agent: request.headers.get("user-agent") ?? "",
         result: "failed",
         error_type: "rate_limited",
+        signals: botRisk.signals,
       });
 
       return NextResponse.json(
@@ -277,6 +358,7 @@ export async function POST(request: NextRequest) {
         user_agent: request.headers.get("user-agent") ?? "",
         result: "failed",
         error_type: "invalid_id",
+        signals: botRisk.signals,
       });
 
       // Ajouter un délai artificiel pour masquer les timing attacks
@@ -303,6 +385,7 @@ export async function POST(request: NextRequest) {
         user_agent: request.headers.get("user-agent") ?? "",
         result: "failed",
         error_type: "invalid_id",
+        signals: botRisk.signals,
       });
 
       // Détection fraude : plusieurs échecs sur le même identifiant
@@ -316,21 +399,112 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── Document verrouillé (décision d'administration) ────
+    // Le verrouillage suspend temporairement la consultation (litige,
+    // examen, vérification interne) SANS annuler le document. Le visiteur
+    // voit un message sobre — l'existence du document est révélée (choix
+    // produit), mais aucun contenu n'est exposé.
+    if (releve.locked_at) {
+      await logVerification(supabase, {
+        releve_id: releve.id,
+        attempted_id: id,
+        ip_address: ipHash,
+        user_agent: request.headers.get("user-agent") ?? "",
+        result: "failed",
+        error_type: "locked",
+        signals: botRisk.signals,
+      });
+
+      await delay(Math.max(0, 200 - (Date.now() - startTime)));
+
+      return NextResponse.json(
+        { success: false, error: { code: "locked", message: "" } },
+        { status: 403 }
+      );
+    }
+
     // ── Succès ─────────────────────────────────────────────
-    await logVerification(supabase, {
-      releve_id: releve.id,
-      ip_address: ipHash,
-      user_agent: request.headers.get("user-agent") ?? "",
-      result: "success",
-      error_type: "",
+    // L'UUID est généré côté serveur (crypto.randomUUID) pour servir de
+    // référence de traçabilité dans le filigrane — sans relecture RLS.
+    const verificationId = crypto.randomUUID();
+    await logVerification(
+      supabase,
+      {
+        releve_id: releve.id,
+        ip_address: ipHash,
+        user_agent: request.headers.get("user-agent") ?? "",
+        result: "success",
+        error_type: "",
+        signals: botRisk.signals,
+      },
+      verificationId
+    );
+
+    // Email étudiant post-réponse via after() — garanti en environnement
+    // serverless (Vercel) alors qu'un simple `void` non-attendu serait tué au
+    // freeze du runtime. Un échec d'envoi ne doit jamais affecter la réponse.
+    // (Le récapitulatif admin quotidien est, lui, planifié en amont pour
+    // couvrir aussi les tentatives échouées.)
+    const notifParams = {
+      studentName: releve.student_name,
+      studentEmail: releve.student_email ?? "",
+      releveId: releve.id,
+      verifiedAt: new Date(),
+    };
+    after(async () => {
+      await sendStudentVerificationNotification(notifParams);
     });
 
-    return NextResponse.json({ success: true, data: { releve } });
+    // NB: le champ student_email est retiré de la réponse publique (RGPD) ;
+    // verificationId alimente le filigrane anti-capture (traçabilité).
+    return NextResponse.json({
+      success: true,
+      data: { releve: toPublicReleve(releve), verificationId },
+    });
   } catch {
     return NextResponse.json(
       { success: false, error: { code: "server_error", message: "" } },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Bloque une IP dans rate_limits (upsert de la ligne existante, ou insertion).
+ * checkRateLimit refusera ensuite toute tentative tant que `blocked_until`
+ * est dans le futur — même logique d'upsert que le blocage du rate limit,
+ * pour garantir une seule ligne par IP/endpoint.
+ */
+async function blockIp(
+  supabase: SupabaseClient<Database>,
+  ipHash: string
+): Promise<void> {
+  const blockedUntil = new Date(Date.now() + BOT_BLOCK_MS).toISOString();
+  const { data: existing } = await supabase
+    .from("rate_limits")
+    .select("id")
+    .eq("ip_address", ipHash)
+    .eq("endpoint", "/api/verify")
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from("rate_limits")
+      .update({
+        attempt_count: BOT_ATTEMPT_COUNT,
+        window_start: new Date().toISOString(),
+        blocked_until: blockedUntil,
+      })
+      .eq("ip_address", ipHash)
+      .eq("endpoint", "/api/verify");
+  } else {
+    await supabase.from("rate_limits").insert({
+      ip_address: ipHash,
+      endpoint: "/api/verify",
+      attempt_count: BOT_ATTEMPT_COUNT,
+      window_start: new Date().toISOString(),
+      blocked_until: blockedUntil,
+    });
   }
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Icon from "@/components/Icon";
 import type { Releve, ApiResponse } from "@/lib/types/database";
 
 interface NoteRow {
@@ -15,6 +16,8 @@ interface CreateReleveFormProps {
   onCancel: () => void;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const emptyNote = (): NoteRow => ({ matiere: "", code: "", credit: 3, note: 10 });
 
 /**
@@ -25,6 +28,7 @@ const emptyNote = (): NoteRow => ({ matiere: "", code: "", credit: 3, note: 10 }
 export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFormProps) {
   const [studentName, setStudentName] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [studentEmail, setStudentEmail] = useState("");
   const [promo, setPromo] = useState("");
   const [notes, setNotes] = useState<NoteRow[]>([emptyNote()]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +76,11 @@ export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFo
       return;
     }
 
+    if (!EMAIL_REGEX.test(studentEmail.trim())) {
+      setError("Veuillez saisir un email étudiant valide (obligatoire pour les notifications).");
+      return;
+    }
+
     if (validNotes.length === 0) {
       setError("Ajoutez au moins une note avec une matière.");
       return;
@@ -85,6 +94,7 @@ export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFo
         body: JSON.stringify({
           student_name: studentName.trim(),
           student_id: studentId.trim(),
+          student_email: studentEmail.trim().toLowerCase(),
           promo: promo.trim(),
           notes_data: validNotes.map((n) => ({
             matiere: n.matiere.trim(),
@@ -122,14 +132,15 @@ export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFo
         <button
           type="button"
           onClick={onCancel}
-          className="text-sm text-escen-text-secondary hover:text-escen-cyan transition-colors"
+          className="text-sm text-escen-text-secondary hover:text-escen-cyan transition-colors inline-flex items-center gap-1"
         >
-          ✕ Fermer
+          <Icon name="close" size={16} />
+          Fermer
         </button>
       </div>
 
       {/* Infos étudiant */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-escen-text-secondary mb-1.5">
             Nom de l&apos;étudiant *
@@ -156,6 +167,23 @@ export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFo
         </div>
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-escen-text-secondary mb-1.5">
+            Email étudiant *
+          </label>
+          <input
+            type="email"
+            value={studentEmail}
+            onChange={(e) => setStudentEmail(e.target.value)}
+            placeholder="Ex : jeanne.moreau@gmail.com"
+            required
+            autoComplete="email"
+            className="w-full h-[44px] px-3 text-sm bg-escen-bg border border-escen-border rounded-xl outline-none focus:border-escen-cyan focus:ring-1 focus:ring-escen-cyan/30"
+          />
+          <p className="mt-1 text-[0.6rem] text-escen-text-secondary/70">
+            L&apos;étudiant est prévenu à chaque vérification de son document.
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-escen-text-secondary mb-1.5">
             Promotion
           </label>
           <input
@@ -175,9 +203,10 @@ export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFo
           <button
             type="button"
             onClick={addNote}
-            className="px-3 py-1.5 text-xs font-semibold text-escen-cyan bg-escen-cyan-50 border border-escen-cyan-100 rounded-lg hover:bg-escen-cyan-100 transition-colors"
+            className="px-3 py-1.5 text-xs font-semibold text-escen-cyan bg-escen-cyan-50 border border-escen-cyan-100 rounded-lg hover:bg-escen-cyan-100 transition-colors inline-flex items-center gap-1"
           >
-            + Ajouter une matière
+            <Icon name="add" size={14} />
+            Ajouter une matière
           </button>
         </div>
 
@@ -224,7 +253,7 @@ export default function CreateReleveForm({ onCreated, onCancel }: CreateReleveFo
                 className="col-span-1 text-center text-escen-text-secondary hover:text-red-500 transition-colors disabled:opacity-30"
                 title="Supprimer cette ligne"
               >
-                ✕
+                <Icon name="close" size={16} />
               </button>
             </div>
           ))}

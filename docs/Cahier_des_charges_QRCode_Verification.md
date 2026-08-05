@@ -4,8 +4,8 @@
 
 **QR Code et vérification des relevés de notes**
 
-| **Date** | 17 juillet 2026 |
-| **Statut** | Projet, à valider |
+| **Date** | 17 juillet 2026 (mise à jour : 5 août 2026) |
+| **Statut** | Projet — **version à jour (août 2026) : fonctionnalités complétées et décisions actées** |
 
 # **1\. Objectif du projet**
 
@@ -67,16 +67,20 @@ C'est la page que voit le recruteur juste après avoir scanné le QR Code. Elle 
 
 - Page publique, sans compte à créer, utilisable facilement sur téléphone.
 - Affichage du relevé numérique officiel et à jour, une fois l'identifiant validé.
+- **Consultation seule** : la page est en lecture seule (clic droit, sélection, impression et raccourcis bloqués). Le PDF n'est jamais téléchargeable par le public — il est réservé à l'administration.
+- **Filigrane de traçabilité** : la date de vérification et une référence unique sont répétées en filigrane sur le document — toute capture d'écran diffusée peut être reliée à la vérification d'origine.
+- **Document verrouillé** : quand l'université suspend temporairement un document (litige, examen), le visiteur voit un message sobre « Document temporairement indisponible ».
 - En cas d'identifiant faux ou de relevé annulé, un message d'erreur clair s'affiche, sans donner d'indice utile à un fraudeur.
-- Le système est protégé contre les robots qui essaieraient de deviner des identifiants au hasard.
+- Le système est protégé contre les robots qui essaieraient de deviner des identifiants au hasard : CAPTCHA (Turnstile), limitation du nombre de tentatives, et **détection des outils d'automatisation** (navigation headless, WebDriver, requêtes scriptées).
 
 ## **La traçabilité des vérifications**
 
 Chaque passage sur la page de vérification doit laisser une trace, pour permettre un contrôle en cas de doute.
 
-- Chaque vérification est enregistrée : date, heure, identifiant, résultat (réussi ou échoué).
-- Seules la scolarité et le service informatique peuvent consulter cet historique.
-- Une alerte est envoyée en cas de comportement anormal, par exemple beaucoup de tentatives sur un même identifiant.
+- Chaque vérification est enregistrée : date, heure, identifiant, résultat (réussi ou échoué), et **signaux d'automatisation** éventuellement détectés.
+- Seules la scolarité et le service informatique peuvent consulter cet historique (**filtres** : résultat, type d'erreur, signaux, période, identifiant ; **vue détaillée** par vérification).
+- Une alerte est envoyée en cas de comportement anormal, par exemple beaucoup de tentatives sur un même identifiant (**page « Alertes fraude »** dans l'administration).
+- **Notifications de vérification** : l'étudiant est prévenu immédiatement à chaque vérification réussie ; l'administration reçoit un **récapitulatif quotidien** (au plus un email par jour), avec le détail des vérifications, réussies, échouées et bloquées.
 - Il est possible d'exporter cet historique pour un contrôle ou un audit.
 
 ## **La gestion par l'université**
@@ -84,8 +88,9 @@ Chaque passage sur la page de vérification doit laisser une trace, pour permett
 La scolarité et le service informatique doivent pouvoir gérer le système au quotidien, sans dépendre d'un développeur externe pour les tâches courantes.
 
 - Un espace d'administration sécurisé, réservé à la scolarité et le service IT.
-- La possibilité de rechercher un relevé par identifiant ou par nom d'étudiant.
-- La possibilité d'annuler un relevé en cas de fraude ou d'erreur grave.
+- La possibilité de rechercher un relevé par identifiant, par nom d'étudiant ou par email.
+- La possibilité d'annuler un relevé en cas de fraude ou d'erreur grave, et de **verrouiller temporairement** un document (suspension de consultation sans annulation).
+- L'email de l'étudiant est **obligatoire** à la création : il reçoit une notification à chaque vérification de son document.
 - Les actions faites dans l'espace d'administration sont elles aussi enregistrées.
 
 # **5\. Exigences importantes**
@@ -114,8 +119,9 @@ Ces exigences s'appliquent au QR Code et à la page de vérification. Elles cond
 
 | **Élément** | **Contenu** |
 | --- | --- |
-| Relevé | Identifiant unique, étudiant, notes, date de création, statut (actif, annulé, remplacé) |
-| Historique de vérification | Identifiant consulté, date, heure, résultat |
+| Relevé | Identifiant unique, étudiant, **email étudiant**, notes, date de création, statut (actif, annulé, remplacé), **verrouillage** |
+| Historique de vérification | Identifiant consulté, date, heure, résultat, **signaux d'automatisation** |
+| Alerte anti-fraude | Identifiant ciblé, nombre de tentatives, IP (hashée), date |
 
 # **7\. Comment savoir que le système fonctionne bien**
 
@@ -123,7 +129,9 @@ Ces exigences s'appliquent au QR Code et à la page de vérification. Elles cond
 - Le scan avec un téléphone normal amène bien à la page de vérification, sans application à installer.
 - Un identifiant valide affiche bien le relevé officiel et à jour.
 - Un identifiant faux affiche un message d'erreur clair, sans donner d'information utile à un fraudeur.
-- Chaque vérification est bien enregistrée et visible dans l'espace d'administration.
+- Un document verrouillé affiche le message sobre prévu, et redevient consultable après déverrouillage.
+- Chaque vérification est bien enregistrée (avec ses signaux d'automatisation) et visible dans l'espace d'administration.
+- L'étudiant et l'administration reçoivent bien une notification à chaque vérification réussie.
 - Les tests de sécurité ne révèlent aucun problème grave.
 
 # **8\. Questions à régler avec l'université**
@@ -132,20 +140,20 @@ Ces questions doivent être tranchées avant ou pendant le développement du sys
 
 ## **Sur le fonctionnement**
 
-1. Faut-il permettre de télécharger le relevé en PDF, ou juste le voir à l'écran ?
+1. ~~Faut-il permettre de télécharger le relevé en PDF, ou juste le voir à l'écran ?~~ → **Acté : consultation seule au public ; le PDF est réservé à l'administration.**
 2. Faut-il montrer toutes les notes en détail, ou juste un résumé (moyenne, mention) ?
-3. Que faire si un étudiant conteste un relevé déjà publié et déjà scanné par des recruteurs ?
-4. Faut-il générer les codes QR et les relevés avec le système ?
+3. Que faire si un étudiant conteste un relevé déjà publié et déjà scanné par des recruteurs ? → **Réponse partielle : le verrouillage temporaire permet de suspendre la consultation en cas de litige.**
+4. Faut-il générer les codes QR et les relevés avec le système ?
 
 ## **Sur la sécurité**
 
 1. Le QR Code et l'identifiant suffisent-ils, ou faut-il ajouter une information supplémentaire (nom, date de naissance) ?
-2. Faut-il un contrôle anti-robot (CAPTCHA) dès le lancement, ou seulement en cas d'abus constaté ?
-3. Combien de temps faut-il garder l'historique des vérifications ?
+2. ~~Faut-il un contrôle anti-robot (CAPTCHA) dès le lancement, ou seulement en cas d'abus constaté ?~~ → **Acté : dès le lancement** (Turnstile + détection d'automatisation).
+3. ~~Combien de temps faut-il garder l'historique des vérifications ?~~ → **Acté : 5 ans, puis purge automatique (RGPD).**
 
 ## **Sur la technique**
 
 1. Le système actuel de la scolarité permet-il une récupération automatique des relevés, ou faut-il passer par des fichiers exportés régulièrement ?
 2. Combien de relevés sont créés chaque année environ, pour bien dimensionner le système ?
 3. Le nom de domaine du site de vérification est-il déjà disponible, ou faut-il le réserver ?
-4. Le site doit-il être en français seulement, ou aussi en anglais ?
+4. ~~Le site doit-il être en français seulement, ou aussi en anglais ?~~ → **Acté : bilingue FR + EN.**

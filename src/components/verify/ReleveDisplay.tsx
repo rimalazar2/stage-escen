@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import Icon from "@/components/Icon";
 import type { Releve } from "@/lib/types/database";
 import type { Locale } from "@/lib/types/database";
 
@@ -10,19 +12,83 @@ interface ReleveDisplayProps {
   /** Identifiant saisi/scanné — si différent de releve.id, c'est qu'un
    *  ancien QR code affiche la version mise à jour (chaîne de remplacement). */
   requestedId?: string;
+  /** Référence de la vérification enregistrée — affichée en filigrane pour
+   *  tracer toute capture d'écran diffusée (consultable dans l'historique). */
+  verificationId?: string;
 }
 
 /**
  * Affiche le relevé de notes officiel (version numérique).
  * Utilisé sur la page de vérification après validation de l'identifiant.
  */
-export default function ReleveDisplay({ releve, locale, verifiedAt, requestedId }: ReleveDisplayProps) {
+export default function ReleveDisplay({ releve, locale, verifiedAt, requestedId, verificationId }: ReleveDisplayProps) {
   const isFrench = locale === "fr";
 
+  // ── Filigrane anti-capture ───────────────────────────────
+  // Le blocage technique d'une capture d'écran est impossible côté
+  // navigateur (touche Impr. écran, caméra…) — le filigrane est donc le
+  // dissuasif DÉCISIF : la date/heure de vérification + une référence
+  // unique sont répétées en diagonale sur le document. Toute capture
+  // diffusée peut être reliée à la vérification d'origine dans l'historique.
+  const watermarkText = verificationId
+    ? `ESCEN · ${isFrench ? "Vérifié le" : "Verified on"} ${verifiedAt} · ${isFrench ? "Réf" : "Ref"} ${verificationId.slice(0, 8)}`
+    : "";
+  const watermarkBackground = watermarkText
+    ? `url("data:image/svg+xml;utf8,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="190">` +
+          `<text x="180" y="95" fill="rgba(29,43,107,0.055)" font-family="Avenir, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="middle" transform="rotate(-24 180 95)">` +
+          `${watermarkText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}` +
+          `</text></svg>`
+      )}")`
+    : "none";
+
+  // ── Consultation uniquement ─────────────────────────────────
+  // Le document est en lecture seule : aucun téléchargement, aucune
+  // impression, aucune capture facile. NB : bloquer à 100 % les captures
+  // d'écran est techniquement impossible côté navigateur (touche Impr. écran,
+  // caméra de téléphone, enregistrement d'écran) — ceci constitue un
+  // ensemble de dissuasifs : clic droit, sélection, glisser-déposer,
+  // raccourcis clavier et impression.
+  useEffect(() => {
+    const blockKeys = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (
+        // Imprimer / Enregistrer / Code source
+        (mod && ["p", "s", "u"].includes(key)) ||
+        // DevTools
+        e.key === "F12" ||
+        (mod && e.shiftKey && ["i", "j", "c"].includes(key))
+      ) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", blockKeys);
+    return () => window.removeEventListener("keydown", blockKeys);
+  }, []);
+
   return (
-    <div className="w-full max-w-[800px] mx-auto">
+    <div
+      className="w-full max-w-[800px] mx-auto releve-protected select-none"
+      onContextMenu={(e) => e.preventDefault()}
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+    >
       {/* En-tête du document officiel */}
-      <div className="bg-white border-2 border-escen-navy rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(29,43,107,0.12)]">
+      <div className="relative bg-white border-2 border-escen-navy rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(29,43,107,0.12)]">
+        {/* Filigrane de traçabilité (visible sur toute capture diffusée) */}
+        {watermarkBackground !== "none" && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 z-[1] pointer-events-none select-none"
+            style={{
+              backgroundImage: watermarkBackground,
+              backgroundSize: "360px 190px",
+              backgroundRepeat: "repeat",
+            }}
+          />
+        )}
         {/* Bandeau ESCEN */}
         <div className="bg-escen-navy px-6 py-4 flex items-center justify-between">
           <div>
@@ -52,7 +118,7 @@ export default function ReleveDisplay({ releve, locale, verifiedAt, requestedId 
         {/* Bandeau : version mise à jour (ancien QR → nouvelle version) */}
         {requestedId && requestedId !== releve.id && (
           <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 flex items-center gap-2">
-            <span className="text-lg">🔄</span>
+            <Icon name="sync" size={20} className="text-yellow-600 shrink-0" />
             <p className="text-sm font-semibold text-yellow-800">
               {isFrench
                 ? "Ce QR code affiche la version mise à jour de ce document."
@@ -63,7 +129,7 @@ export default function ReleveDisplay({ releve, locale, verifiedAt, requestedId 
 
         {/* Sceau de vérification */}
         <div className="bg-escen-cyan-50 px-6 py-3 flex items-center gap-2 border-b border-escen-cyan-100">
-          <span className="text-lg">✅</span>
+          <Icon name="verified" size={20} className="text-green-600 shrink-0" />
           <span className="text-sm font-semibold text-escen-navy">
             {isFrench
               ? "Document authentifié par ESCEN"
@@ -211,6 +277,7 @@ export default function ReleveDisplay({ releve, locale, verifiedAt, requestedId 
                 width={96}
                 height={96}
                 className="w-24 h-24"
+                draggable={false}
               />
             </div>
             <div className="flex-1 text-center sm:text-left">
@@ -224,14 +291,12 @@ export default function ReleveDisplay({ releve, locale, verifiedAt, requestedId 
                   ? "Scannez-le pour revérifier ce relevé à tout moment."
                   : "Scan it to re-verify this transcript at any time."}
               </p>
-              <a
-                href={`/api/releve/${releve.id}/pdf`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-escen-navy rounded-xl hover:bg-escen-navy-500 transition-colors"
-              >
-                📄 {isFrench ? "Télécharger le PDF" : "Download PDF"}
-              </a>
+              <p className="inline-flex items-center gap-1.5 text-[0.65rem] font-medium text-escen-text-secondary/70">
+                <Icon name="lock" size={14} />
+                {isFrench
+                  ? "Consultation sécurisée — le téléchargement n'est pas disponible."
+                  : "Secure viewing — download is not available."}
+              </p>
             </div>
           </div>
         </div>

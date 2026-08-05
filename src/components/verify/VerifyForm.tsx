@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import TurnstileWidget from "@/components/verify/TurnstileWidget";
+import { detectAutomationClient } from "@/lib/bot-detection";
 import type { VerifyResponse } from "@/lib/types/database";
 import type { Locale } from "@/lib/types/database";
 
@@ -52,7 +53,13 @@ export default function VerifyForm({ locale, initialId = "", onResult }: VerifyF
       const res = await fetch("/api/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: trimmed, turnstileToken: turnstileToken ?? undefined }),
+        // Signaux d'automatisation (headless/webdriver) : le serveur refuse
+        // toute tentative dont le payload est absent (appel scripté).
+        body: JSON.stringify({
+          id: trimmed,
+          turnstileToken: turnstileToken ?? undefined,
+          clientSignals: detectAutomationClient(),
+        }),
       });
 
       const data: VerifyResponse = await res.json();

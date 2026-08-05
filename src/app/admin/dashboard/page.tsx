@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Icon, { type IconName } from "@/components/Icon";
 import type { ApiResponse, DashboardStats, Verification } from "@/lib/types/database";
 
 interface DashboardView extends DashboardStats {
@@ -87,25 +88,25 @@ export default function AdminDashboardPage() {
         <StatCard
           label="Relevés actifs"
           value={stats?.activeReleves ?? 0}
-          icon="📄"
+          icon="description"
           color="bg-green-50 border-green-200 text-green-700"
         />
         <StatCard
           label="Relevés annulés"
           value={stats?.cancelledReleves ?? 0}
-          icon="⛔"
+          icon="block"
           color="bg-red-50 border-red-200 text-red-700"
         />
         <StatCard
           label="Vérifications totales"
           value={stats?.totalVerifications ?? 0}
-          icon="✅"
+          icon="check_circle"
           color="bg-escen-cyan-50 border-escen-cyan-100 text-escen-navy"
         />
         <StatCard
           label="Aujourd'hui"
           value={stats?.todayVerifications ?? 0}
-          icon="📅"
+          icon="calendar_today"
           color="bg-blue-50 border-blue-200 text-blue-700"
         />
       </div>
@@ -121,9 +122,11 @@ export default function AdminDashboardPage() {
                 className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-escen-cyan-50/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <span className={v.result === "success" ? "text-green-500" : "text-red-400"}>
-                    {v.result === "success" ? "✅" : "❌"}
-                  </span>
+                  <Icon
+                    name={v.result === "success" ? "check_circle" : "cancel"}
+                    size={20}
+                    className={v.result === "success" ? "text-green-500" : "text-red-400"}
+                  />
                   <div>
                     <p className="text-sm font-medium text-escen-navy">
                       {v.releves?.student_name ?? "Inconnu"}
@@ -161,13 +164,13 @@ function StatCard({
 }: {
   label: string;
   value: number;
-  icon: string;
+  icon: IconName;
   color: string;
 }) {
   return (
     <div className={`border rounded-xl p-4 transition-transform duration-200 hover:scale-[1.02] ${color}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-lg">{icon}</span>
+        <Icon name={icon} size={22} />
       </div>
       <p className="text-2xl font-bold">{value}</p>
       <p className="text-xs font-medium opacity-80">{label}</p>

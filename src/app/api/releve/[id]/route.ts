@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { resolveActiveReleve } from "@/lib/releves";
+import { resolveActiveReleve, toPublicReleve } from "@/lib/releves";
 
 /**
  * GET /api/releve/[id]
  * Récupère un relevé de notes par son identifiant unique.
- * Accessible publiquement (uniquement si actif).
+ * Accessible publiquement (uniquement si actif et non verrouillé).
+ * NB: la réponse passe par toPublicReleve — l'email étudiant et les
+ * métadonnées internes (pdf_url, locked_at, replaced_by) ne fuient jamais.
  */
 export async function GET(
   _request: NextRequest,
@@ -35,7 +37,16 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: { releve } });
+    // Même règle que /api/verify : un document verrouillé n'est jamais
+    // consultable via une route publique (message sobre, pas de contenu).
+    if (releve.locked_at) {
+      return NextResponse.json(
+        { success: false, error: { code: "locked", message: "" } },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: { releve: toPublicReleve(releve) } });
   } catch {
     return NextResponse.json(
       { success: false, error: { code: "server_error", message: "" } },
