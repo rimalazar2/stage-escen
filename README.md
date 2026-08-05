@@ -38,7 +38,7 @@ Built with **Next.js 16**, **TypeScript**, **Tailwind CSS v4** et **Supabase**.
 | `/api/notify` | POST | Inscription email « me notifier au lancement » (idempotent, rate limiting) |
 | `/api/admin/login` | POST / DELETE | Connexion / déconnexion admin |
 | `/api/admin/releves` | GET / POST | Liste / création des relevés |
-| `/api/admin/releves/[id]` | GET / PATCH / DELETE | Détail / modification / suppression |
+| `/api/admin/releves/[id]` | GET | Détail d'un relevé (vérifications associées + versions remplacées) |
 | `/api/admin/releves/[id]/status` | PUT | Annulation / remplacement / réactivation / **verrouillage** — l'étudiant est prévenu par email à chaque changement |
 | `/api/admin/stats` | GET | Statistiques du dashboard |
 | `/api/admin/verifications` | GET | Historique des vérifications (filtres : résultat, erreur, signaux, période, identifiant) |
@@ -124,5 +124,11 @@ npm start
 
 ## Documentation
 
+- [Référentiel technique (types, routes, libs)](docs/REFERENTIEL.md)
 - [Cahier des charges](docs/Cahier_des_charges_QRCode_Verification.md)
+- [Suivi du projet](docs/SUIVI.md)
 - [Schéma SQL](supabase-schema.sql)
+
+## Code source
+
+Dépôt public : [github.com/rimalazar2/stage-escen](https://github.com/rimalazar2/stage-escen)

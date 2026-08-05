@@ -1,6 +1,6 @@
 # 📋 Suivi du projet — ESCEN · Vérification sécurisée des relevés
 
-> **Dernière mise à jour : 05/08/2026 (session : icônes Google + notifications email + verrouillage + journalisation enrichie + filigrane anti-capture + digest quotidien + livrable)**
+> **Dernière mise à jour : 05/08/2026 (session : icônes Google + notifications email + verrouillage + journalisation enrichie + filigrane anti-capture + digest quotidien + référentiel technique + livrable + push GitHub)**
 > Ce fichier est la **source de vérité** de l'avancement. Il est mis à jour à chaque fin de session.
 > Légende : ✅ Fait · 🔄 En cours · ⏳ À faire · 🚫 Bloqué
 
@@ -129,6 +129,6 @@ Chaque lot ci-dessus correspond à un **milestone GitHub**. Les tâches `⏳` no
 
 | Date | Contenu | Commit |
 |---|---|---|
-| 05/08/2026 | **Travail complet** : icônes Google Material Symbols (composant `Icon`, toutes les pages) · champ `student_email` obligatoire + notifications email (étudiant immédiat, **digest admin quotidien** via table `email_digests`) · **verrouillage de document** (colonne `locked_at`, UI admin, code `locked` public) · **journalisation enrichie** (signaux bots stockés, filtres + détail dans `/admin/logs`, page `/admin/fraude`) · **filigrane anti-capture** (verificationId traçable, recherche par `id_text`) · **emails étudiant de changement de statut** (annulation/remplacement/réactivation/verrouillage) · masquage RGPD de l'email dans les réponses publiques · schéma appliqué (setup-db) · README + SUIVI + cahier des charges mis à jour | — |
+| 05/08/2026 | **Travail complet** : icônes Google Material Symbols (composant `Icon`, toutes les pages) · champ `student_email` obligatoire + notifications email (étudiant immédiat, **digest admin quotidien** via table `email_digests`) · **verrouillage de document** (colonne `locked_at`, UI admin, code `locked` public) · **journalisation enrichie** (signaux bots stockés, filtres + détail dans `/admin/logs`, page `/admin/fraude`) · **filigrane anti-capture** (verificationId traçable, recherche par `id_text`) · **emails étudiant de changement de statut** (annulation/remplacement/réactivation/verrouillage) · masquage RGPD de l'email dans les réponses publiques · schéma appliqué (setup-db) · **référentiel technique** (`docs/REFERENTIEL.md`) · **dépôt GitHub public** créé et poussé (`github.com/rimalazar2/stage-escen`, 19 commits) · README + SUIVI + cahier des charges + référentiel à jour | `2ff82c1` |
 | 03/08/2026 | Flux de remplacement « QR code éternel » (`resolve_active_releve`, test E2E 6/6, bouton « Remplacer » admin, bandeau « version mise à jour ») + **nettoyage lint complet (37 → 0)** + génération du CR JOURNÉE 3 | `07c4b0b` |
 | 01/08/2026 | Alerte anti-fraude testée (email Resend délivré), CAPTCHA Turnstile, purge RGPD 5 ans, setup-db + seed | — |
